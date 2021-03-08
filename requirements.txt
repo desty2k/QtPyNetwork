@@ -1,0 +1,4 @@
+QtPy
+Pyside2
+setuptools
+cryptography
