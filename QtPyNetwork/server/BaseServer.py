@@ -2,7 +2,7 @@ from qtpy.QtCore import Slot, Signal, QObject, QThread
 from qtpy.QtNetwork import QTcpServer, QHostAddress
 
 
-from QtPyNetwork.models.Device import Device
+from QtPyNetwork.models import Device
 
 import logging
 
