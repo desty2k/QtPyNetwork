@@ -21,15 +21,19 @@ class SocketClient(QObject):
     connect_signal = Signal(str, int, bytes)
     disconnect_signal = Signal()
 
-    def __init__(self, ip: str, port: int, key: bytes):
+    def __init__(self, ip: str, port: int, key: bytes, loggerName=None):
         super(SocketClient, self).__init__(None)
         self.ip = ip
         self.port = port
         self.key = key
+        self.logger_name = loggerName
 
     @Slot()
     def start(self):
-        self._logger = logging.getLogger(self.__class__.__name__)  # noqa
+        if self.logger_name:
+            self.logger = logging.getLogger(self.logger_name)  # noqa
+        else:
+            self.logger = logging.getLogger(self.__class__.__name__)  # noqa
         self.tcpSocket = QTcpSocket(self)  # noqa
 
         self.tcpSocket.setObjectName("qclient_socket")
@@ -40,7 +44,7 @@ class SocketClient(QObject):
             self.failed_to_connect.emit(self.ip, self.port)
             self.tcpSocket.disconnectFromHost()
             self.tcpSocket.close()
-            self._logger.error("Failed to connect to {}:{}".format(self.ip, self.port))
+            self.logger.error("Failed to connect to {}:{}".format(self.ip, self.port))
             return
 
         self.close_signal.connect(self.close, Qt.BlockingQueuedConnection)
@@ -58,25 +62,25 @@ class SocketClient(QObject):
         message = struct.pack('!L', len(message)) + message
         self.tcpSocket.write(message)
         self.tcpSocket.flush()
-        self._logger.debug("Data sent to: {}:{} - {}".format(self.tcpSocket.peerAddress().toString(),
+        self.logger.debug("Data sent to: {}:{} - {}".format(self.tcpSocket.peerAddress().toString(),
                                                              self.tcpSocket.peerPort(),
                                                              message))
 
     @Slot(int)
     def on_qclient_socket_error(self, error):
-        self._logger.error(self.tcpSocket.errorString())
+        self.logger.error(self.tcpSocket.errorString())
         self.error.emit(error)
 
     @Slot()
     def on_qclient_socket_connected(self):
         ip = self.tcpSocket.peerAddress().toString()
         port = int(self.tcpSocket.peerPort())
-        self._logger.debug("Connected to {}:{}".format(ip, port))
+        self.logger.debug("Connected to {}:{}".format(ip, port))
         self.connected.emit(ip, port)
 
     @Slot()
     def on_qclient_socket_disconnected(self):
-        self._logger.info("Disconnected from server")
+        self.logger.info("Disconnected from server")
         self.disconnected.emit()
 
     @Slot()
@@ -91,7 +95,7 @@ class SocketClient(QObject):
                     data = decrypt(data, self.key).decode()
                 else:
                     data = data.decode()
-                self._logger.debug("Received: {}".format(data))
+                self.logger.debug("Received: {}".format(data))
                 data = json.loads(data)
                 self.message.emit(data)
             else:
@@ -143,7 +147,7 @@ class QThreadedClient(QObject):
     error = Signal(str)
     failed_to_connect = Signal(str, int)
 
-    def __init__(self):
+    def __init__(self, loggerName=None):
         super(QThreadedClient, self).__init__(None)
         self.__ip = None
         self.__port = None
@@ -151,6 +155,7 @@ class QThreadedClient(QObject):
 
         self.__client = None
         self.__client_thread = None
+        self.__logger_name = loggerName
 
     @Slot()
     def start(self, ip: str, port: int, key: bytes):
@@ -159,7 +164,7 @@ class QThreadedClient(QObject):
         self.__port = port
         self.__key = key
 
-        self.__client = SocketClient(self.__ip, self.__port, self.__key)
+        self.__client = SocketClient(self.__ip, self.__port, self.__key, self.__logger_name)
         self.__client_thread = QThread()
 
         self.__client_thread.started.connect(self.__client.start)

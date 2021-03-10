@@ -27,9 +27,12 @@ class QBaseServer(QObject):
     error = Signal(int, str)
     closed = Signal()
 
-    def __init__(self):
+    def __init__(self, loggerName=None):
         super(QBaseServer, self).__init__()
-        self.__logger = logging.getLogger(self.__class__.__name__)
+        if loggerName:
+            self.__logger = logging.getLogger(loggerName)
+        else:
+            self.__logger = logging.getLogger(self.__class__.__name__)
         self.__ip = None
         self.__port = None
 

@@ -371,6 +371,6 @@ class BalancedSocketHandler(QObject):
 
 
 class QBalancedServer(QBaseServer):
-    def __init__(self):
-        super(QBalancedServer, self).__init__()
+    def __init__(self, *args, **kwargs):
+        super(QBalancedServer, self).__init__(*args, **kwargs)
         self.setHandlerClass(BalancedSocketHandler)

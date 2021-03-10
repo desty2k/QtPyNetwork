@@ -279,6 +279,6 @@ class QThreadedServer(QBaseServer):
     """Socket server with dynamic amount of threads. When client connects,
     handler creates new thread and passes socket descriptor to that thread. """
 
-    def __init__(self):
-        super(QThreadedServer, self).__init__()
+    def __init__(self, *args, **kwargs):
+        super(QThreadedServer, self).__init__(*args, **kwargs)
         self.setHandlerClass(ThreadedSocketHandler)
