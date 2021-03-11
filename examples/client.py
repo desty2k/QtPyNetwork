@@ -22,6 +22,7 @@ class Main(QObject):
         self.cln = QThreadedClient()
         self.cln.message.connect(self.client_data_received)
         self.cln.failed_to_connect.connect(self.close)
+        self.cln.disconnected.connect(self.close)
         self.cln.start(IP, PORT, KEY)
 
     @Slot(dict)
