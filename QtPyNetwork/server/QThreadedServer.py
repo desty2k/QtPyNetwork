@@ -144,10 +144,11 @@ class ThreadedSocketHandler(QObject):
     """
     started = Signal()
     finished = Signal()
-    message = Signal(int, dict)
     close_signal = Signal()
 
     connected = Signal(int, str, int)
+    message = Signal(int, dict)
+    error = Signal(int, str)
     disconnected = Signal(int)
 
     write = Signal(int, dict)
@@ -156,15 +157,13 @@ class ThreadedSocketHandler(QObject):
     def __init__(self, key=None):
         super(ThreadedSocketHandler, self).__init__(None)
         self.key = key
-        self.next_id = 0
-        self.devices = []  # noqa
-        self.clients = []  # noqa
-        self.threads = []  # noqa
 
     @Slot()
     def start(self):
         """Start server."""
         self._logger = logging.getLogger(self.__class__.__name__)  # noqa
+        self.clients = []  # noqa
+        self.threads = []  # noqa
 
         self.close_signal.connect(self.close, Qt.BlockingQueuedConnection)
         self.started.emit()
@@ -180,16 +179,14 @@ class ThreadedSocketHandler(QObject):
             socket_descriptor (int): Socket descriptor.
         """
         thread = QThread()
-        client = SocketClient(socket_descriptor, self._get_free_id())
+        client = SocketClient(socket_descriptor, self.get_free_id())
         client.moveToThread(thread)
         thread.started.connect(client.run)  # noqa
 
-        client.closed.connect(thread.quit)  # noqa
-        client.closed.connect(thread.wait)  # noqa
-        client.connected.connect(self.on_successful_connection)  # noqa
-        client.disconnected.connect(self.on_device_disconnected)
-        # client.error.connect(self.on_error)
-        client.message.connect(self.on_message)  # noqa
+        client.connected.connect(self.connected.emit)  # noqa
+        client.message.connect(self.message.emit)  # noqa
+        client.error.connect(self.error.emit)
+        client.disconnected.connect(self.disconnected.emit)
 
         client.closed.connect(thread.quit)  # noqa
         client.closed.connect(thread.wait)  # noqa
@@ -200,26 +197,6 @@ class ThreadedSocketHandler(QObject):
 
         self._logger.info("Started new client thread!")
         self._logger.debug("Active clients: {}".format(sum([1 for x in self.threads if x.isRunning()])))
-
-    @Slot(int, str, int)
-    def on_successful_connection(self, device_id, ip, port):
-        """When client connects to server successfully."""
-        device = Device(device_id, ip, port)
-        self.devices.append(device)
-        self.connected.emit(device_id, ip, port)
-        self._logger.info("Added new CLIENT-{} with address {}:{}".format(device_id, ip, port))
-
-    @Slot(int, dict)
-    def on_message(self, device_id: int, message: dict):
-        """When server receives message from client."""
-
-        self.message.emit(device_id, message)
-
-    @Slot(int)
-    def on_device_disconnected(self, device_id):
-        """When client disconnects from server."""
-        self.devices.remove(self._get_device_by_id(device_id))
-        self.disconnected.emit(device_id)
 
     @Slot(int, dict)
     def _write(self, device_id: int, msg: dict) -> None:
@@ -246,17 +223,20 @@ class ThreadedSocketHandler(QObject):
             client.write.emit(msg)
 
     @Slot()
-    def _get_free_id(self) -> int:
+    def get_free_id(self) -> int:
         """Returns not used device ID."""
-        self.next_id = self.next_id + 1
-        return self.next_id
-
-    @Slot(int)
-    def _get_device_by_id(self, device_id: int) -> Device:
-        for device in self.devices:
-            if device.get_id() == device_id:
-                return device
-        raise Exception("CLIENT-{} not found".format(device_id))
+        used = []
+        for i in self.clients:
+            used = used + i.used_ids()
+        used = sorted(used)
+        if len(used) > 0:
+            maxid = max(used)
+            for i in range(1, maxid):
+                if i not in used:
+                    return i
+            return maxid + 1
+        else:
+            return 1
 
     @Slot()
     def close(self) -> None:

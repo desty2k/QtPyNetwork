@@ -58,6 +58,7 @@ class QBaseServer(QObject):
 
             self.__handler.connected.connect(self.on_successful_connection)
             self.__handler.message.connect(self.on_message)
+            self.__handler.error.connect(self.error.emit)
             self.__handler.disconnected.connect(self.on_device_disconnected)
 
             self.__handler_thread.started.connect(self.__handler.start)

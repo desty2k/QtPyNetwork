@@ -236,10 +236,11 @@ class BalancedSocketHandler(QObject):
     """
     started = Signal()
     finished = Signal()
-    message = Signal(int, dict)
     close_signal = Signal()
 
     connected = Signal(int, str, int)
+    message = Signal(int, dict)
+    error = Signal(int, str)
     disconnected = Signal(int)
 
     write = Signal(int, dict)
@@ -270,10 +271,12 @@ class BalancedSocketHandler(QObject):
                 worker = SocketWorker()
                 worker.moveToThread(thread)
                 thread.started.connect(worker.start)  # noqa
+
                 worker.connected.connect(self.connected.emit)  # noqa
                 worker.message.connect(self.message.emit)  # noqa
                 worker.disconnected.connect(self.disconnected.emit)
-                # worker.disconnected.connect(self.on_bot_disconnected)  # noqa
+                worker.error.connect(self.error.emit)
+
                 worker.closed.connect(thread.quit)  # noqa
                 worker.closed.connect(thread.wait)  # noqa
                 self.workers.append(worker)
@@ -311,7 +314,7 @@ class BalancedSocketHandler(QObject):
         """
         count_list = [x.socket_count() for x in self.workers]
         worker_id = count_list.index(min(count_list))
-        device_id = self._get_free_id()
+        device_id = self.get_free_id()
         self.workers[worker_id].connection.emit(device_id, socket_descriptor)
 
     @Slot(int, dict)
@@ -339,7 +342,7 @@ class BalancedSocketHandler(QObject):
             worker.writeAll.emit(msg)
 
     @Slot()
-    def _get_free_id(self) -> int:
+    def get_free_id(self) -> int:
         """Returns not used device ID."""
         used = []
         for i in self.workers:
