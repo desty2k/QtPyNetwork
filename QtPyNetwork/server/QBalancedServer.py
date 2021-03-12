@@ -279,9 +279,11 @@ class BalancedSocketHandler(QObject):
 
                 worker.closed.connect(thread.quit)  # noqa
                 worker.closed.connect(thread.wait)  # noqa
+
                 self.workers.append(worker)
                 self.threads.append(thread)
                 thread.start()
+
             self.__logger.info("Started worker threads!")
             self.__logger.debug("Active socket workers: {}".format(sum([1 for x in self.threads if x.isRunning()])))
             self.started.emit()
@@ -327,7 +329,7 @@ class BalancedSocketHandler(QObject):
         """
         for worker in self.workers:
             if worker.has_device_id(device_id):
-                worker.send.emit(device_id, msg)
+                worker.write.emit(device_id, msg)
                 return
         self.__logger.error("Could not find client with ID: {}!".format(device_id))
 
