@@ -188,8 +188,8 @@ class ThreadedSocketHandler(QObject):
         client.error.connect(self.error.emit)
         client.disconnected.connect(self.disconnected.emit)
 
-        client.closed.connect(thread.quit)  # noqa
-        client.closed.connect(thread.wait)  # noqa
+        client.disconnected.connect(thread.quit)  # noqa
+        client.disconnected.connect(thread.wait)  # noqa
 
         self.clients.append(client)
         self.threads.append(thread)
