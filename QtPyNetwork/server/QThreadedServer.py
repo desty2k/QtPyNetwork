@@ -138,9 +138,9 @@ class ThreadedSocketHandler(QObject):
     Signals:
         - started (): Handler started.
         - finished (): Handler finished.
-        - message (device_id: int, message: dict): Message received.
+        - message (client_id: int, message: dict): Message received.
         - close_signal (): Emit this to close handler from another thread.
-        - connection (device_id: int): New connection.
+        - connection (client_id: int): New connection.
     """
     started = Signal()
     finished = Signal()
@@ -186,7 +186,7 @@ class ThreadedSocketHandler(QObject):
         client.connected.connect(self.connected.emit)  # noqa
         client.message.connect(self.message.emit)  # noqa
         client.error.connect(self.error.emit)
-        client.disconnected.connect(self.disconnected.emit)
+        client.disconnected.connect(self._on_client_disconnected)
 
         client.disconnected.connect(thread.quit)  # noqa
         client.disconnected.connect(thread.wait)  # noqa
@@ -198,19 +198,36 @@ class ThreadedSocketHandler(QObject):
         self._logger.info("Started new client thread!")
         self._logger.debug("Active clients: {}".format(sum([1 for x in self.threads if x.isRunning()])))
 
+    @Slot(int)
+    def _on_client_disconnected(self, client_id: int):
+        self.clients.remove(self._get_client_by_id(client_id))
+        self.disconnected.emit(client_id)
+
+    @Slot(int)
+    def _get_client_by_id(self, client_id: int):
+        """Returns client object associated to provided ID.
+
+        Args:
+            client_id (int): Client ID.
+        """
+        for client in self.clients:
+            if client.get_id() == client_id:
+                return client
+        return None
+
     @Slot(int, dict)
-    def _write(self, device_id: int, msg: dict) -> None:
+    def _write(self, client_id: int, msg: dict) -> None:
         """Write to client with ID.
 
         Args:
-            device_id (int): Client ID.
+            client_id (int): Client ID.
             msg (dict): Message.
         """
         for client in self.clients:
-            if client.get_id() == device_id:
+            if client.get_id() == client_id:
                 client.write.emit(msg)
                 return
-        self._logger.error("Could not find client with ID: {}!".format(device_id))
+        self._logger.error("Could not find client with ID: {}!".format(client_id))
 
     @Slot(dict)
     def _writeAll(self, msg: dict) -> None:
@@ -225,10 +242,7 @@ class ThreadedSocketHandler(QObject):
     @Slot()
     def get_free_id(self) -> int:
         """Returns not used device ID."""
-        used = []
-        for i in self.clients:
-            used = used + i.used_ids()
-        used = sorted(used)
+        used = sorted(i.get_id() for i in self.clients)
         if len(used) > 0:
             maxid = max(used)
             for i in range(1, maxid):
