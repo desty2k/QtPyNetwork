@@ -22,7 +22,7 @@ class Main(QObject):
 
         self.srv = QThreadedServer()
         self.srv.disconnected.connect(self.close)
-        self.srv.connected.connect(lambda device_id, ip, port: self.srv.writeAll({"id": device_id,
+        self.srv.connected.connect(lambda device_id, ip, port: self.srv.write(device_id, {"id": device_id,
                                                                                   "ip": ip,
                                                                                   "port": port,
                                                                                   "data": "Hello world!"}))
