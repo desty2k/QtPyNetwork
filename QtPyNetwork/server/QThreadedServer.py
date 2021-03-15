@@ -179,6 +179,7 @@ class ThreadedSocketHandler(QObject):
             socket_descriptor (int): Socket descriptor.
         """
         client_id = self.get_free_id()
+
         thread = QThread()
         thread.setObjectName(str(client_id))
         client = SocketClient(socket_descriptor, client_id)
@@ -192,6 +193,7 @@ class ThreadedSocketHandler(QObject):
 
         client.disconnected.connect(thread.quit)  # noqa
         client.disconnected.connect(thread.wait)  # noqa
+        thread.finished.connect(self.on_thread_finished)
 
         self.clients.append(client)
         self.threads.append(thread)
@@ -204,6 +206,10 @@ class ThreadedSocketHandler(QObject):
     def on_client_disconnected(self, client_id: int):
         self.clients.remove(self.get_client_by_id(client_id))
         self.disconnected.emit(client_id)
+
+    @Slot()
+    def on_thread_finished(self):
+        self.threads = [thread for thread in self.threads if thread.isRunning()]
 
     @Slot(int)
     def get_client_by_id(self, client_id: int):
