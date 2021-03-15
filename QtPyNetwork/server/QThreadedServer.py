@@ -178,15 +178,17 @@ class ThreadedSocketHandler(QObject):
         Args:
             socket_descriptor (int): Socket descriptor.
         """
+        client_id = self.get_free_id()
         thread = QThread()
-        client = SocketClient(socket_descriptor, self.get_free_id())
+        thread.setObjectName(str(client_id))
+        client = SocketClient(socket_descriptor, client_id)
         client.moveToThread(thread)
         thread.started.connect(client.run)  # noqa
 
         client.connected.connect(self.connected.emit)  # noqa
         client.message.connect(self.message.emit)  # noqa
         client.error.connect(self.error.emit)
-        client.disconnected.connect(self._on_client_disconnected)
+        client.disconnected.connect(self.on_client_disconnected)
 
         client.disconnected.connect(thread.quit)  # noqa
         client.disconnected.connect(thread.wait)  # noqa
@@ -199,12 +201,12 @@ class ThreadedSocketHandler(QObject):
         self._logger.debug("Active clients: {}".format(len([x for x in self.threads if x.isRunning()])))
 
     @Slot(int)
-    def _on_client_disconnected(self, client_id: int):
-        self.clients.remove(self._get_client_by_id(client_id))
+    def on_client_disconnected(self, client_id: int):
+        self.clients.remove(self.get_client_by_id(client_id))
         self.disconnected.emit(client_id)
 
     @Slot(int)
-    def _get_client_by_id(self, client_id: int):
+    def get_client_by_id(self, client_id: int):
         """Returns client object associated to provided ID.
 
         Args:
