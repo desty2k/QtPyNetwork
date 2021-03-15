@@ -196,7 +196,7 @@ class ThreadedSocketHandler(QObject):
         thread.start()
 
         self._logger.info("Started new client thread!")
-        self._logger.debug("Active clients: {}".format(sum([1 for x in self.threads if x.isRunning()])))
+        self._logger.debug("Active clients: {}".format(len([x for x in self.threads if x.isRunning()])))
 
     @Slot(int)
     def _on_client_disconnected(self, client_id: int):
