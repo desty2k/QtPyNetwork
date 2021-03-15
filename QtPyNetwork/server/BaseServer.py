@@ -72,8 +72,12 @@ class QBaseServer(QObject):
         """Create QTCPServer, start listening for connections."""
         self.__server = TCPServer()
         self.__server.connection.connect(self.__handler.on_incoming_connection)
-        self.__server.listen(self.__ip, self.__port)
-        self.__logger.info("Started listening for connections")
+        if self.__server.listen(self.__ip, self.__port):
+            self.__logger.info("Started listening for connections")
+        else:
+            e = self.__server.errorString()
+            self.__logger.error(e)
+            self.error.emit(0, e)
 
     @Slot(int, str, int)
     def on_successful_connection(self, device_id, ip, port):
