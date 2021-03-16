@@ -37,18 +37,18 @@ class Main(QObject):
 
 
 if __name__ == '__main__':
+    logging.basicConfig(
+        level=logging.NOTSET,
+        format="%(asctime)s [%(threadName)s] [%(name)s] [%(levelname)s] %(message)s",
+        handlers=[logging.StreamHandler()])
+    logging.getLogger().debug("Logger enabled")
+
     sys._excepthook = sys.excepthook
     def exception_hook(exctype, value, tb):
         logging.critical(''.join(traceback.format_exception(exctype, value, tb)))
         sys._excepthook(exctype, value, tb)
         sys.exit(1)
     sys.excepthook = exception_hook
-
-    logging.basicConfig(
-        level=logging.NOTSET,
-        format="%(asctime)s [%(threadName)s] [%(name)s] [%(levelname)s] %(message)s",
-        handlers=[logging.StreamHandler()])
-    logging.getLogger().debug("Logger enabled")
 
     app = QCoreApplication(sys.argv)
 
