@@ -54,7 +54,7 @@ class SocketClient(QObject):
 
     @Slot(dict)
     def _write(self, message: dict):
-        """Send dict to server"""
+        """Write dict to server"""
         message = json.dumps(message)
         message = message.encode()
         if self.key:
@@ -63,8 +63,8 @@ class SocketClient(QObject):
         self.tcpSocket.write(message)
         self.tcpSocket.flush()
         self.logger.debug("Data sent to: {}:{} - {}".format(self.tcpSocket.peerAddress().toString(),
-                                                             self.tcpSocket.peerPort(),
-                                                             message))
+                                                            self.tcpSocket.peerPort(),
+                                                            message))
 
     @Slot(int)
     def on_qclient_socket_error(self, error):
@@ -134,7 +134,7 @@ class QThreadedClient(QObject):
 
     Available slots:
         - start(): Start client.
-        - send(data: dict): Send message to server.
+        - write(data: dict): Write message to server.
         - close(): Close connection.
         - disconnectFromServer(): Disconnect from server.
         - connectTo(ip: str, port: int, key: bytes): (Re)connect to server.
@@ -164,7 +164,7 @@ class QThreadedClient(QObject):
         self.__port = port
         self.__key = key
 
-        self.__client = SocketClient(self.__ip, self.__port, self.__key, self.__logger_name)
+        self.__client = SocketClient(self.__ip, self.__port, self.__key, loggerName=self.__logger_name)
         self.__client_thread = QThread()
 
         self.__client_thread.started.connect(self.__client.start)
@@ -182,11 +182,11 @@ class QThreadedClient(QObject):
         self.__client_thread.start()
 
     @Slot(dict)
-    def send(self, data: dict):
-        """Send data to server.
+    def write(self, data: dict):
+        """write data to server.
 
         Args:
-            data (dict): Data to send.
+            data (dict): Data to write.
         """
         self.__client.write_signal.emit(data)
 
