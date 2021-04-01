@@ -1,4 +1,5 @@
 import json
+import zlib
 import struct
 import logging
 
@@ -92,9 +93,9 @@ class SocketClient(QObject):
                 msg_size = struct.unpack('!L', header)[0]
                 data = self.tcpSocket.read(msg_size)
                 if self.key:
-                    data = decrypt(data, self.key).decode()
-                else:
-                    data = data.decode()
+                    data = decrypt(data, self.key)
+                data = data.decode()
+
                 self.logger.debug("Received: {}".format(data))
                 data = json.loads(data)
                 self.message.emit(data)
