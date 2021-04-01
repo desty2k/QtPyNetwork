@@ -1,10 +1,11 @@
 from qtpy.QtCore import Slot, Signal, QObject, QThread, Qt
-from qtpy.QtNetwork import QTcpServer, QTcpSocket, QHostAddress
+from qtpy.QtNetwork import QTcpSocket
 
 import json
 import struct
 import logging
 
+from QtPyNetwork.core.crypto import encrypt, decrypt
 from QtPyNetwork.server.BaseServer import QBaseServer
 
 
@@ -35,8 +36,9 @@ class SocketWorker(QObject):
     write = Signal(int, dict)
     writeAll = Signal(dict)
 
-    def __init__(self, parent=None):
+    def __init__(self, key=b"", parent=None):
         super(SocketWorker, self).__init__(parent)
+        self.key = key
 
     @Slot()
     def start(self) -> None:
@@ -79,6 +81,8 @@ class SocketWorker(QObject):
             try:
                 message = json.dumps(msg)
                 message = message.encode()
+                if self.key:
+                    message = encrypt(message, self.key)
                 message = struct.pack('!L', len(message)) + message
                 socket.write(message)
                 socket.flush()
@@ -99,6 +103,8 @@ class SocketWorker(QObject):
             try:
                 message = json.dumps(msg)
                 message = message.encode()
+                if self.key:
+                    message = encrypt(message, self.key)
                 message = struct.pack('!L', len(message)) + message
                 socket.write(message)
                 socket.flush()
@@ -174,7 +180,10 @@ class SocketWorker(QObject):
         header = conn.read(header_size)
         if len(header) == 4:
             msg_size = struct.unpack('!L', header)[0]
-            message = conn.read(msg_size).decode()
+            message = conn.read(msg_size)
+            if self.key:
+                message = decrypt(message, self.key)
+            message = message.decode()
         else:
             message = None
         if message:
@@ -268,7 +277,7 @@ class BalancedSocketHandler(QObject):
         try:
             for i in range(self.cores):
                 thread = QThread()
-                worker = SocketWorker()
+                worker = SocketWorker(self.key)
                 worker.moveToThread(thread)
                 thread.started.connect(worker.start)  # noqa
 

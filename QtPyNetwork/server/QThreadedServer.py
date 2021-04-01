@@ -2,10 +2,11 @@ from qtpy.QtCore import Slot, Signal, QObject, QThread, Qt
 from qtpy.QtNetwork import QTcpServer, QTcpSocket, QHostAddress
 
 import json
+import zlib
 import struct
 import logging
 
-from QtPyNetwork.models.Device import Device
+from QtPyNetwork.core.crypto import encrypt, decrypt
 from QtPyNetwork.server.BaseServer import QBaseServer
 
 
@@ -21,10 +22,11 @@ class SocketClient(QObject):
 
     write = Signal(dict)
 
-    def __init__(self, socket_descriptor, client_id):
+    def __init__(self, socket_descriptor, client_id, key):
         super(SocketClient, self).__init__(None)
         self.socket_descriptor = socket_descriptor
         self.id = client_id
+        self.key = key
 
     @Slot()
     def get_id(self):
@@ -71,6 +73,8 @@ class SocketClient(QObject):
             try:
                 message = json.dumps(msg)
                 message = message.encode()
+                if self.key:
+                    message = encrypt(message, self.key)
                 message = struct.pack('!L', len(message)) + message
                 self.socket.write(message)
                 self.socket.flush()
@@ -91,7 +95,10 @@ class SocketClient(QObject):
         header = self.socket.read(header_size)
         if len(header) == 4:
             msg_size = struct.unpack('!L', header)[0]
-            message = self.socket.read(msg_size).decode()
+            message = self.socket.read(msg_size)
+            if self.key:
+                message = decrypt(message, self.key)
+            message = message.decode()
         else:
             message = None
         if message:
@@ -182,7 +189,7 @@ class ThreadedSocketHandler(QObject):
 
         thread = QThread()
         thread.setObjectName(str(client_id))
-        client = SocketClient(socket_descriptor, client_id)
+        client = SocketClient(socket_descriptor, client_id, self.key)
         client.moveToThread(thread)
         thread.started.connect(client.run)  # noqa
 
