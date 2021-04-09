@@ -7,6 +7,7 @@ from qtpy.QtCore import QObject, QIODevice, Signal, QMetaObject, Slot, QThread, 
 from qtpy.QtNetwork import QTcpSocket, QHostAddress, QAbstractSocket
 
 from QtPyNetwork.core.crypto import encrypt, decrypt
+from QtPyNetwork.core.serial import MessageEncoder, MessageDecoder
 
 
 class SocketClient(QObject):
@@ -27,6 +28,7 @@ class SocketClient(QObject):
         self.ip = ip
         self.port = port
         self.key = key
+        self.old_key = key
         self.logger_name = loggerName
 
     @Slot()
@@ -35,6 +37,7 @@ class SocketClient(QObject):
             self.logger = logging.getLogger(self.logger_name)  # noqa
         else:
             self.logger = logging.getLogger(self.__class__.__name__)  # noqa
+        self.data = {"size_left": 0, "data": b""}  # noqa
         self.tcpSocket = QTcpSocket(self)  # noqa
 
         self.tcpSocket.setObjectName("qclient_socket")
@@ -56,16 +59,16 @@ class SocketClient(QObject):
     @Slot(dict)
     def _write(self, message: dict):
         """Write dict to server"""
-        message = json.dumps(message)
+        message = json.dumps(message, cls=MessageEncoder)
         message = message.encode()
         if self.key:
             message = encrypt(message, self.key)
         message = struct.pack('!L', len(message)) + message
         self.tcpSocket.write(message)
         self.tcpSocket.flush()
-        self.logger.debug("Data sent to: {}:{} - {}".format(self.tcpSocket.peerAddress().toString(),
-                                                            self.tcpSocket.peerPort(),
-                                                            message))
+        # self.logger.debug("Data sent to: {}:{} - {}".format(self.tcpSocket.peerAddress().toString(),
+        #                                                     self.tcpSocket.peerPort(),
+        #                                                     message))
 
     @Slot(int)
     def on_qclient_socket_error(self, error):
@@ -86,21 +89,45 @@ class SocketClient(QObject):
 
     @Slot()
     def on_qclient_socket_readyRead(self):
-        header_size = struct.calcsize('!L')
-        while True:
+        if len(self.data.get("data")) > 0:
+            size_left = self.data.get("size_left")
+            message = self.tcpSocket.read(size_left)
+            size_left = size_left - len(message)
+            if size_left > 0:
+                self.data["size_left"] = size_left
+                self.data["data"] += message
+                return
+
+            else:
+                message = self.data.get("data") + message
+                self.data["size_left"] = 0
+                self.data["data"] = b""
+
+        else:
+            header_size = struct.calcsize('!L')
             header = self.tcpSocket.read(header_size)
             if len(header) == 4:
                 msg_size = struct.unpack('!L', header)[0]
-                data = self.tcpSocket.read(msg_size)
-                if self.key:
-                    data = decrypt(data, self.key)
-                data = data.decode()
 
-                self.logger.debug("Received: {}".format(data))
-                data = json.loads(data)
-                self.message.emit(data)
-            else:
-                break
+                if self.tcpSocket.bytesAvailable() < msg_size:
+                    message = self.tcpSocket.read(msg_size)
+                    msg_size = msg_size - len(message)
+                    self.data["data"] = message
+                    self.data["size_left"] = msg_size
+                    return
+                else:
+                    message = self.tcpSocket.read(msg_size)
+
+        if self.key:
+            message = decrypt(message, self.key)
+        message = message.decode()
+        # self.logger.debug("Received: {}".format(message))
+        try:
+            message = json.loads(message, cls=MessageDecoder)
+            self.message.emit(message)
+        except json.JSONDecodeError as e:
+            pass
+            # self._logger.error("Could not decode message: {}".format(e))
 
     @Slot(str, int, bytes)
     def _connectTo(self, ip: str, port: int, key: bytes):
@@ -113,6 +140,16 @@ class SocketClient(QObject):
     @Slot()
     def _disconnect(self):
         self.tcpSocket.disconnectFromHost()
+
+    @Slot(bytes)
+    def setCustomKey(self, key: bytes):
+        """Sets custom encryption key."""
+        self.key = key
+
+    @Slot()
+    def clearCustomKey(self):
+        """Removes custom key."""
+        self.key = self.old_key
 
     @Slot()
     def close(self):
@@ -190,6 +227,22 @@ class QThreadedClient(QObject):
             data (dict): Data to write.
         """
         self.__client.write_signal.emit(data)
+
+    @Slot(bytes)
+    def setCustomKey(self, key: bytes):
+        """Sets custom encryption key."""
+        if self.__client and self.__client_thread:
+            self.__client.setCustomKey(key)
+        else:
+            self.error.emit("Client not running")
+
+    @Slot()
+    def clearCustomKey(self):
+        """Removes custom key."""
+        if self.__client and self.__client_thread:
+            self.__client.clearCustomKey()
+        else:
+            self.error.emit("Client not running")
 
     @Slot()
     def close(self):

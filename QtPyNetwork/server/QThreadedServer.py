@@ -2,11 +2,11 @@ from qtpy.QtCore import Slot, Signal, QObject, QThread, Qt
 from qtpy.QtNetwork import QTcpServer, QTcpSocket, QHostAddress
 
 import json
-import zlib
 import struct
 import logging
 
 from QtPyNetwork.core.crypto import encrypt, decrypt
+from QtPyNetwork.core.serial import MessageDecoder, MessageEncoder
 from QtPyNetwork.server.BaseServer import QBaseServer
 
 
@@ -27,17 +27,15 @@ class SocketClient(QObject):
         self.socket_descriptor = socket_descriptor
         self.id = client_id
         self.key = key
-
-    @Slot()
-    def get_id(self):
-        return self.id
+        self.old_key = key
 
     @Slot()
     def run(self) -> None:
         """Run socket manager"""
         self._logger = logging.getLogger(self.__class__.__name__)  # noqa
+        self.data = {"size_left": 0, "data": b""}  # noqa
         self.socket = QTcpSocket()  # noqa
-        self.socket.setParent(None)
+        self.socket.setParent(None)  # noqa
         if self.socket.setSocketDescriptor(self.socket_descriptor):  # noqa
             self.socket.readyRead.connect(self.on_message)  # noqa
             self.socket.disconnected.connect(self.on_disconnected)  # noqa
@@ -52,15 +50,18 @@ class SocketClient(QObject):
             self.write.connect(self._write)
 
     @Slot()
-    def close(self):
-        """Close connection.
+    def get_id(self):
+        return self.id
 
-        Note:
-            Emits closed signal.
-        """
-        self.socket.close()
-        self.socket.deleteLater()
-        self.closed.emit()
+    @Slot(bytes)
+    def setCustomKey(self, key: bytes):
+        """Sets custom encryption key."""
+        self.key = key
+
+    @Slot()
+    def clearCustomKey(self):
+        """Removes custom key."""
+        self.key = self.old_key
 
     @Slot(dict)
     def _write(self, msg: dict):
@@ -71,16 +72,17 @@ class SocketClient(QObject):
         """
         if self.socket:
             try:
-                message = json.dumps(msg)
+                message = json.dumps(msg, cls=MessageEncoder)
                 message = message.encode()
                 if self.key:
                     message = encrypt(message, self.key)
                 message = struct.pack('!L', len(message)) + message
                 self.socket.write(message)
                 self.socket.flush()
-                self._logger.debug("CLIENT-{} Sent: {}".format(self.get_id(), message))
+                # self._logger.debug("CLIENT-{} Sent: {}".format(self.get_id(), message))
             except json.JSONDecodeError as e:
-                self._logger.error("CLIENT-{} Could not encode message: {}".format(self.get_id(), e))
+                pass
+                # self._logger.error("CLIENT-{} Could not encode message: {}".format(self.get_id(), e))
         else:
             self._logger.warning("Socket not created.")
 
@@ -91,23 +93,45 @@ class SocketClient(QObject):
         Note:
             Emits message signal.
         """
-        header_size = struct.calcsize('!L')
-        header = self.socket.read(header_size)
-        if len(header) == 4:
-            msg_size = struct.unpack('!L', header)[0]
-            message = self.socket.read(msg_size)
-            if self.key:
-                message = decrypt(message, self.key)
-            message = message.decode()
+        if len(self.data.get("data")) > 0:
+            size_left = self.data.get("size_left")
+            message = self.socket.read(size_left)
+            size_left = size_left - len(message)
+            if size_left > 0:
+                self.data["size_left"] = size_left
+                self.data["data"] += message
+                return
+
+            else:
+                message = self.data.get("data") + message
+                self.data["size_left"] = 0
+                self.data["data"] = b""
+
         else:
-            message = None
-        if message:
-            self._logger.debug("CLIENT-{} Received: {}".format(self.get_id(), message))
-            try:
-                message = json.loads(message)
-                self.message.emit(int(self.get_id()), message)
-            except json.JSONDecodeError as e:
-                self._logger.error("CLIENT-{} Could not decode message: {}".format(self.get_id(), e))
+            header_size = struct.calcsize('!L')
+            header = self.socket.read(header_size)
+            if len(header) == 4:
+                msg_size = struct.unpack('!L', header)[0]
+
+                if self.socket.bytesAvailable() < msg_size:
+                    message = self.socket.read(msg_size)
+                    msg_size = msg_size - len(message)
+                    self.data["data"] = message
+                    self.data["size_left"] = msg_size
+                    return
+                else:
+                    message = self.socket.read(msg_size)
+
+        if self.key:
+            message = decrypt(message, self.key)
+        message = message.decode()
+        # self._logger.debug("CLIENT-{} Received: {}".format(device_id, message))
+        try:
+            message = json.loads(message, cls=MessageDecoder)
+            self.message.emit(int(self.get_id()), message)
+        except json.JSONDecodeError as e:
+            pass
+            # self._logger.error("CLIENT-{} Could not decode message: {}".format(device_id, e))
 
     @Slot()
     def on_disconnected(self):
@@ -138,6 +162,17 @@ class SocketClient(QObject):
         self._logger.error("CLIENT-{} Error: {}".format(self.get_id(), e))
         self.error.emit(self.get_id(), str(e))
 
+    @Slot()
+    def close(self):
+        """Close connection.
+
+        Note:
+            Emits closed signal.
+        """
+        self.socket.close()
+        self.socket.deleteLater()
+        self.closed.emit()
+
 
 class ThreadedSocketHandler(QObject):
     """Creates client threads.
@@ -160,6 +195,7 @@ class ThreadedSocketHandler(QObject):
 
     write = Signal(int, dict)
     writeAll = Signal(dict)
+    kick = Signal(int)
 
     def __init__(self, key=None):
         super(ThreadedSocketHandler, self).__init__(None)
@@ -173,10 +209,11 @@ class ThreadedSocketHandler(QObject):
         self.threads = []  # noqa
 
         self.close_signal.connect(self.close, Qt.BlockingQueuedConnection)
-        self.started.emit()
-
         self.write.connect(self._write)
         self.writeAll.connect(self._writeAll)
+        self.kick.connect(self._kick)
+
+        self.started.emit()
 
     @Slot(int)
     def on_incoming_connection(self, socket_descriptor: int) -> None:
@@ -193,13 +230,13 @@ class ThreadedSocketHandler(QObject):
         client.moveToThread(thread)
         thread.started.connect(client.run)  # noqa
 
-        client.connected.connect(self.connected.emit)  # noqa
-        client.message.connect(self.message.emit)  # noqa
+        client.connected.connect(self.connected.emit)
+        client.message.connect(self.message.emit)
         client.error.connect(self.error.emit)
         client.disconnected.connect(self.on_client_disconnected)
 
-        client.disconnected.connect(thread.quit)  # noqa
-        client.disconnected.connect(thread.wait)  # noqa
+        client.disconnected.connect(thread.quit)
+        client.disconnected.connect(thread.wait)
         thread.finished.connect(self.on_thread_finished)
 
         self.clients.append(client)
@@ -230,6 +267,39 @@ class ThreadedSocketHandler(QObject):
                 return client
         return None
 
+    @Slot()
+    def get_free_id(self) -> int:
+        """Returns not used device ID."""
+        used = sorted(i.get_id() for i in self.clients)
+        if len(used) > 0:
+            maxid = max(used)
+            for i in range(1, maxid):
+                if i not in used:
+                    return i
+            return maxid + 1
+        else:
+            return 1
+
+    @Slot(int, bytes)
+    def setCustomKeyForClient(self, bot_id: int, key: bytes):
+        """Sets custom encryption key for one client."""
+        for client in self.clients:
+            if client.get_id() == bot_id:
+                client.setCustomKey(key)
+
+    @Slot(int)
+    def removeCustomKeyForClient(self, bot_id: int):
+        """Removes custom key for client."""
+        for client in self.clients:
+            if client.get_id() == bot_id:
+                client.clearCustomKey()
+
+    @Slot()
+    def clearCustomKeys(self):
+        """Removes custom key for all clients."""
+        for client in self.clients:
+            client.clearCustomKey()
+
     @Slot(int, dict)
     def _write(self, client_id: int, msg: dict) -> None:
         """Write to client with ID.
@@ -254,18 +324,18 @@ class ThreadedSocketHandler(QObject):
         for client in self.clients:
             client.write.emit(msg)
 
-    @Slot()
-    def get_free_id(self) -> int:
-        """Returns not used device ID."""
-        used = sorted(i.get_id() for i in self.clients)
-        if len(used) > 0:
-            maxid = max(used)
-            for i in range(1, maxid):
-                if i not in used:
-                    return i
-            return maxid + 1
-        else:
-            return 1
+    @Slot(int)
+    def _kick(self, device_id: int) -> None:
+        """Kick client with ID.
+
+        Args:
+            device_id (int): Client ID.
+        """
+        for client in self.clients:
+            if client.get_id() == device_id:
+                client.close_signal.emit()
+                return
+        self.__logger.error("Could not find client with ID: {}!".format(device_id))
 
     @Slot()
     def close(self) -> None:

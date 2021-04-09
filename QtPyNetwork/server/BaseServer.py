@@ -106,6 +106,14 @@ class QBaseServer(QObject):
             return
         self.__handler.write.emit(device_id, data)
 
+    @Slot(int)
+    def kick(self, device_id):
+        """Disconnect device from server."""
+        if not self.__server or not self.__handler:
+            self.__logger.error("Server not running!")
+            return
+        self.__handler.kick.emit(device_id)
+
     @Slot(dict)
     def writeAll(self, data: dict):
         """Write data to all devices."""
@@ -118,11 +126,19 @@ class QBaseServer(QObject):
     def close(self):
         """Disconnect clients and close server."""
         self.__logger.info("Closing server...")
+        if self.__server:
+            self.__server.close()
         if self.__handler:
             self.__handler.close()
             self.__handler_thread.quit()
-        if self.__server:
-            self.__server.close()
+
+    @Slot(int, bytes)
+    def setCustomKeyForClient(self, bot_id: int, key: bytes):
+        """Sets custom encryption key for one client."""
+        if not self.isRunning():
+            raise Exception("Server not running!")
+
+        self.__handler.setCustomKeyForClient(bot_id, key)
 
     def setDeviceModel(self, model):
         """Set model to use for device when client connects.
