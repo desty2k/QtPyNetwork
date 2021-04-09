@@ -1,4 +1,4 @@
 QtPy
-Pyside2
+PyQt5
 setuptools
 cryptography
