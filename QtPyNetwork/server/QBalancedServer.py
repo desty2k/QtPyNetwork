@@ -219,7 +219,7 @@ class SocketWorker(QObject):
                     msg_size = struct.unpack('!L', header)[0]
                     message = conn.read(msg_size)
 
-                    if conn.bytesAvailable() < msg_size:
+                    if len(message) < msg_size:
                         msg_size = msg_size - len(message)
                         self.data[device_id] = {"data": message, "size_left": msg_size}
                     else:
