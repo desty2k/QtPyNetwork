@@ -29,6 +29,7 @@ class SocketClient(QObject):
         self.socket_descriptor = socket_descriptor
         self.id = client_id
         self.key = key
+        self.old_key = key
 
     @Slot()
     def run(self) -> None:
@@ -62,7 +63,7 @@ class SocketClient(QObject):
     @Slot()
     def clearCustomKey(self):
         """Removes custom key."""
-        self.key = None
+        self.key = self.old_key
 
     @Slot(dict)
     def _write(self, msg: dict):

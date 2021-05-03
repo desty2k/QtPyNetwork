@@ -29,6 +29,7 @@ class SocketClient(QObject):
         self.ip = ip
         self.port = port
         self.key = key
+        self.old_key = key
         self.logger_name = loggerName
 
     @Slot()
@@ -138,7 +139,7 @@ class SocketClient(QObject):
     @Slot()
     def clearCustomKey(self):
         """Removes custom key."""
-        self.key = None
+        self.key = self.old_key
 
     @Slot(str, int, bytes)
     def _connectTo(self, ip: str, port: int, key: bytes):
