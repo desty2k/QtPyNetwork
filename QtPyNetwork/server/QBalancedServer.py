@@ -7,7 +7,6 @@ import logging
 
 from QtPyNetwork.core.crypto import encrypt, decrypt
 from QtPyNetwork.server.BaseServer import QBaseServer
-from QtPyNetwork.core.serial import MessageDecoder, MessageEncoder
 
 
 class SocketWorker(QObject):
@@ -37,6 +36,9 @@ class SocketWorker(QObject):
     write = Signal(int, dict)
     writeAll = Signal(dict)
     kick = Signal(int)
+
+    json_encoder = None
+    json_decoder = None
 
     def __init__(self, key=b"", parent=None):
         super(SocketWorker, self).__init__(parent)
@@ -73,7 +75,10 @@ class SocketWorker(QObject):
         if socket:
             device_id = int(socket.objectName())
             try:
-                message = json.dumps(msg, cls=MessageEncoder)
+                if self.json_encoder:
+                    message = json.dumps(msg, cls=self.json_encoder)
+                else:
+                    message = json.dumps(msg)
                 message = message.encode()
                 if device_id in self.keys:
                     message = encrypt(message, self.keys.get(device_id))
@@ -98,7 +103,10 @@ class SocketWorker(QObject):
         for socket in self.sockets:
             device_id = int(socket.objectName())
             try:
-                message = json.dumps(msg, cls=MessageEncoder)
+                if self.json_encoder:
+                    message = json.dumps(msg, cls=self.json_encoder)
+                else:
+                    message = json.dumps(msg)
                 message = message.encode()
                 if device_id in self.keys:
                     message = encrypt(message, self.keys.get(device_id))
@@ -190,45 +198,47 @@ class SocketWorker(QObject):
             Emits message signal.
         """
         device_id = int(conn.objectName())
-        if device_id in self.data:
-            size_left = self.data.get(device_id).get("size_left")
-            message = conn.read(size_left)
-            size_left = size_left - len(message)
-            if size_left > 0:
-                self.data[device_id]["size_left"] = size_left
-                self.data[device_id]["data"] += message
-                return
-            else:
-                message = self.data.get(device_id).get("data") + message
-                del self.data[device_id]
-
-        else:
-            header_size = struct.calcsize('!L')
-            header = conn.read(header_size)
-            if len(header) == 4:
-                msg_size = struct.unpack('!L', header)[0]
-
-                if conn.bytesAvailable() < msg_size:
-                    message = conn.read(msg_size)
-                    msg_size = msg_size - len(message)
-                    self.data[device_id] = {"data": message, "size_left": msg_size}
-                    return
+        while conn.bytesAvailable():
+            if device_id in self.data:
+                size_left = self.data.get(device_id).get("size_left")
+                message = conn.read(size_left)
+                size_left = size_left - len(message)
+                if size_left > 0:
+                    self.data[device_id]["size_left"] = size_left
+                    self.data[device_id]["data"] += message
                 else:
+                    message = self.data.get(device_id).get("data") + message
+                    del self.data[device_id]
+                    self.__process_message(device_id, message)
+
+            else:
+                header_size = struct.calcsize('!L')
+                header = conn.read(header_size)
+                if len(header) == 4:
+                    msg_size = struct.unpack('!L', header)[0]
                     message = conn.read(msg_size)
 
+                    if conn.bytesAvailable() < msg_size:
+                        msg_size = msg_size - len(message)
+                        self.data[device_id] = {"data": message, "size_left": msg_size}
+                    else:
+                        self.__process_message(device_id, message)
+
+    @Slot(bytes)
+    def __process_message(self, device_id, message):
         if device_id in self.keys:
             message = decrypt(message, self.keys.get(device_id))
         elif self.key:
             message = decrypt(message, self.key)
         message = message.decode()
-
-        # self.__logger.debug("CLIENT-{} Received: {}".format(device_id, message))
         try:
-            message = json.loads(message, cls=MessageDecoder)
+            if self.json_decoder:
+                message = json.loads(message, cls=self.json_decoder)
+            else:
+                message = json.loads(message)
             self.message.emit(device_id, message)
         except json.JSONDecodeError as e:
-            pass
-            # self.__logger.error("CLIENT-{} Could not decode message {}: {}".format(device_id, message, e))
+            self.error.emit("Failed to decode message from {}: {}: {}".format(device_id, message, e))
 
     @Slot(QTcpSocket)
     def on_disconnected(self, conn):
@@ -458,6 +468,14 @@ class BalancedSocketHandler(QObject):
         """Removes custom key for all clients."""
         for worker in self.workers:
             worker.clearCustomKeys()
+
+    @Slot(json.JSONEncoder)
+    def setJSONEncoder(self, encoder):
+        SocketWorker.json_encoder = encoder
+
+    @Slot(json.JSONDecoder)
+    def setJSONDecoder(self, decoder):
+        SocketWorker.json_decoder = decoder
 
     @Slot()
     def close(self) -> None:

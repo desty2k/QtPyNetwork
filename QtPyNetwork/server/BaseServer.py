@@ -4,6 +4,7 @@ from qtpy.QtNetwork import QTcpServer, QHostAddress
 
 from QtPyNetwork.models import Device
 
+import json
 import logging
 
 
@@ -136,9 +137,35 @@ class QBaseServer(QObject):
     def setCustomKeyForClient(self, bot_id: int, key: bytes):
         """Sets custom encryption key for one client."""
         if not self.isRunning():
-            raise Exception("Server not running!")
+            raise Exception("Failed to set custom key for client - server not running!")
 
         self.__handler.setCustomKeyForClient(bot_id, key)
+
+    @Slot(int)
+    def removeCustomKeyForClient(self, bot_id: int):
+        """Removes custom key for client."""
+        if not self.isRunning():
+            raise Exception("Failed to remove custom key for client - server not running!")
+        self.__handler.removeCustomKeyForClient(bot_id)
+
+    @Slot()
+    def clearCustomKeys(self):
+        """Removes custom key for all clients."""
+        if not self.isRunning():
+            raise Exception("Failed to clear custom keys - server not running!")
+        self.__handler.clearCustomKeys()
+
+    @Slot(json.JSONEncoder)
+    def setJSONEncoder(self, encoder):
+        if not self.isRunning():
+            raise Exception("Failed to set JSON encoder - server not running")
+        self.__handler.setJSONEncoder(encoder)
+
+    @Slot(json.JSONDecoder)
+    def setJSONDecoder(self, decoder):
+        if not self.isRunning():
+            raise Exception("Failed to set JSON decoder - server not running")
+        self.__handler.setJSONDecoder(decoder)
 
     def setDeviceModel(self, model):
         """Set model to use for device when client connects.
@@ -191,10 +218,8 @@ class QBaseServer(QObject):
         outside this library."""
         if self.isRunning():
             raise Exception("Set socket handler before starting server!")
-
         try:
             handler(key=b"")
         except TypeError as e:
             raise TypeError("Handler is not valid class! Exception: {}".format(e))
-
         self.__handlerClass = handler
