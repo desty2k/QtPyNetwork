@@ -1,6 +1,12 @@
 Changelog
 =========
 
+- 0.4.1:
+    - Fix messages being added to buffer even if they were received in full
+    - Add method for creating worker threads in QBalancedServer
+    - Add info about project to readme
+    - Restore old key after clearing custom encryption key
+
 - 0.4:
     - Fix large messages not being received
     - Add method to set encryption key for client
