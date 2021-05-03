@@ -16,4 +16,4 @@ Important:
     - servers can be subclassed, but handlers should not
 """
 
-__version__ = "0.3"
+__version__ = "0.4"
