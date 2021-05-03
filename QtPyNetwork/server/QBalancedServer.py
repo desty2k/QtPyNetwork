@@ -79,15 +79,16 @@ class SocketWorker(QObject):
                     message = json.dumps(msg, cls=self.json_encoder)
                 else:
                     message = json.dumps(msg)
+
                 message = message.encode()
                 if device_id in self.keys:
                     message = encrypt(message, self.keys.get(device_id))
                 elif self.key:
                     message = encrypt(message, self.key)
+
                 message = struct.pack('!L', len(message)) + message
                 socket.write(message)
                 socket.flush()
-                # self.__logger.debug("CLIENT-{} Sent: {}".format(device_id, message))
             except json.JSONDecodeError as e:
                 self.__logger.error("CLIENT-{} Could not encode message: {}".format(device_id, e))
         else:
@@ -108,17 +109,17 @@ class SocketWorker(QObject):
                 else:
                     message = json.dumps(msg)
                 message = message.encode()
+
                 if device_id in self.keys:
                     message = encrypt(message, self.keys.get(device_id))
                 elif self.key:
                     message = encrypt(message, self.key)
+
                 message = struct.pack('!L', len(message)) + message
                 socket.write(message)
                 socket.flush()
-                # self.__logger.debug("CLIENT-{} Sent: {}".format(device_id, message))
             except json.JSONDecodeError as e:
                 pass
-                # self.__logger.error("CLIENT-{} Could not encode message: {}".format(device_id, e))
 
     @Slot(int)
     def get_socket_by_id(self, device_id: int):
@@ -230,6 +231,7 @@ class SocketWorker(QObject):
             message = decrypt(message, self.keys.get(device_id))
         elif self.key:
             message = decrypt(message, self.key)
+
         message = message.decode()
         try:
             if self.json_decoder:
@@ -344,22 +346,7 @@ class BalancedSocketHandler(QObject):
 
         try:
             for i in range(self.cores):
-                thread = QThread()
-                worker = SocketWorker(self.key)
-                worker.moveToThread(thread)
-                thread.started.connect(worker.start)  # noqa
-
-                worker.connected.connect(self.connected.emit)  # noqa
-                worker.message.connect(self.message.emit)  # noqa
-                worker.disconnected.connect(self.disconnected.emit)
-                worker.error.connect(self.error.emit)
-
-                worker.closed.connect(thread.quit)  # noqa
-                worker.closed.connect(thread.wait)  # noqa
-
-                self.workers.append(worker)
-                self.threads.append(thread)
-                thread.start()
+                self.create_worker()
 
             self.__logger.info("Started worker threads!")
             self.__logger.debug("Active socket workers: {}".format(sum([1 for x in self.threads if x.isRunning()])))
@@ -372,10 +359,15 @@ class BalancedSocketHandler(QObject):
     @Slot()
     def create_worker(self):
         thread = QThread()
-        worker = SocketWorker()
+        worker = SocketWorker(self.key)
         worker.moveToThread(thread)
 
-        thread.started.connect(worker.run)  # noqa
+        worker.connected.connect(self.connected.emit)  # noqa
+        worker.message.connect(self.message.emit)  # noqa
+        worker.disconnected.connect(self.disconnected.emit)  # noqa
+        worker.error.connect(self.error.emit)  # noqa
+
+        thread.started.connect(worker.start)  # noqa
         worker.closed.connect(thread.quit)  # noqa
         worker.closed.connect(thread.wait)  # noqa
 
