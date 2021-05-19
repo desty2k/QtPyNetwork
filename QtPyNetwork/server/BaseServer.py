@@ -84,7 +84,7 @@ class QBaseServer(QObject):
     def on_successful_connection(self, device_id, ip, port):
         """When client connects to server successfully."""
         device = self.__deviceModel(device_id, ip, port)
-        device.__write.connect(self.write)
+        device._write.connect(self.write)
         self.__devices.append(device)
         self.connected.emit(device_id, ip, port)
         self.__logger.info("Added new CLIENT-{} with address {}:{}".format(device_id, ip, port))
