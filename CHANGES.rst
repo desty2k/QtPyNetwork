@@ -1,6 +1,10 @@
 Changelog
 =========
 
+- 0.4.2:
+    - Add write method for device model
+    - Remove logger from device model
+
 - 0.4.1:
     - Fix messages being added to buffer even if they were received in full
     - Add method for creating worker threads in QBalancedServer
