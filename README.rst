@@ -1,8 +1,8 @@
 QtPyNetwork
 ===========
 
-QtPyNetwork is small abstraction layer for sending and receiving messages (JSON dicts). Messages can be encrypted with
-Fernet key.
+QtPyNetwork is small abstraction layer for sending and receiving messages (JSON dicts) using TCP sockets.
+Messages can be encrypted with Fernet key.
 
 There are two servers available - QBalancedServer and QThreadedServer. First one has constant amount of threads.
 When new client connects, server checks which worker has the least amount of active sockets and passes socket
@@ -14,7 +14,7 @@ Features:
 ---------
 
 - Fernet encrypted communication
-- every message write call is executed inside thread
+- every message write and read call is executed inside thread
 - signals for each event - connected, disconnected, error, etc.
 - a different encryption key can be assigned for each client
 - methods for setting custom JSON encoder and decoder
