@@ -1,11 +1,11 @@
-from qtpy.QtCore import QObject, Slot
+from qtpy.QtCore import QObject, Slot, Signal
 
-import logging
 import ipaddress
 
 
 class Device(QObject):
     """Represents psychical device connected to server."""
+    __write = Signal(int, dict)
 
     def __init__(self, device_id: int, ip: str, port: int):
         super(Device, self).__init__(None)
@@ -26,3 +26,7 @@ class Device(QObject):
     @Slot(bool)
     def set_connected(self, value: bool):
         self.connected = value
+
+    @Slot(dict)
+    def write(self, message):
+        self.__write.emit(self.id, message)
