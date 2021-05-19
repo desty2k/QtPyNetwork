@@ -9,8 +9,6 @@ class Device(QObject):
 
     def __init__(self, device_id: int, ip: str, port: int):
         super(Device, self).__init__(None)
-        self.logger = logging.getLogger("DEVICE-{}".format(device_id))
-
         try:
             ipaddress.ip_address(ip)
         except ValueError:
