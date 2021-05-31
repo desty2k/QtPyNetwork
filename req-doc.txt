@@ -1,0 +1,10 @@
+setuptools
+pip
+wheel
+virtualenv
+pipdeptree
+pyqt5
+qtpy
+
+sphinx
+sphinx_rtd_theme
