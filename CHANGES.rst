@@ -1,6 +1,10 @@
 Changelog
 =========
 
+- 0.4.4:
+    - Fix tox build workflow
+    - Fix generating changelog
+
 - 0.4.3:
     - Add build and deploy workflows
     - Add tox config
