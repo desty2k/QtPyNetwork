@@ -10,8 +10,8 @@ descriptor to this thread. QThreadedServer creates new thread for each connected
 
 QThreadedClient is socket client, that keeps socket in separate thread.
 
-Features:
----------
+Features
+--------
 
 - Fernet encrypted communication
 - every message write and read call is executed inside thread
@@ -19,8 +19,8 @@ Features:
 - a different encryption key can be assigned for each client
 - methods for setting custom JSON encoder and decoder
 
-Important:
-----------
+Notes
+-----
 
 - messages must be dicts
 - encryption key must be Fernet key
