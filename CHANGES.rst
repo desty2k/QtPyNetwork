@@ -1,6 +1,11 @@
 Changelog
 =========
 
+- 0.4.3:
+    - Add build and deploy workflows
+    - Add tox config
+    - Add argsparser
+
 - 0.4.2:
     - Add write method for device model
     - Remove logger from device model
