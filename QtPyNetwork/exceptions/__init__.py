@@ -1,0 +1,4 @@
+
+
+class NotConnectedError(Exception):
+    pass
