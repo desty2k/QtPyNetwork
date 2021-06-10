@@ -6,10 +6,10 @@ import logging
 import traceback
 
 from QtPyNetwork.server import QBalancedServer
+from QtPyNetwork.models import Device
 
 IP = "127.0.0.1"
 PORT = 7890
-KEY = b""
 
 
 class Main(QObject):
@@ -21,17 +21,26 @@ class Main(QObject):
         self.logger = logging.getLogger(self.__class__.__name__)
 
         self.srv = QBalancedServer()
-        self.srv.disconnected.connect(self.close)
-        self.srv.connected.connect(lambda device_id, ip, port: self.srv.write(int(device_id), {"id": device_id,
-                                                                                  "ip": ip,
-                                                                                  "port": port,
-                                                                                  "data": "Hello world!"}))
-        self.srv.start(IP, PORT, KEY)
+        self.srv.connected.connect(lambda device, ip, port: device.write(b"Some important data"))
+        self.srv.disconnected.connect(self.on_disconnected)
+        self.srv.message.connect(self.on_message)
+        self.srv.start(IP, PORT)
+
+    @Slot(Device, bytes)
+    def on_message(self, device, message: bytes):
+        self.logger.info("Received {}: {}".format(device.get_id(), message))
+        if message.decode() == "Kick me plz":
+            device.kick()
+
+    @Slot(Device)
+    def on_disconnected(self, device):
+        self.logger.info("Disconnected: {}; Connected: {}".format(device.get_id(), device.is_connected()))
+        self.close()
 
     @Slot()
     def close(self):
         self.srv.close()
-        while self.srv.isRunning():
+        while self.srv.is_running():
             self.srv.wait()
         QApplication.instance().quit()
 

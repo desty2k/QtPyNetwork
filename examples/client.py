@@ -8,7 +8,6 @@ from QtPyNetwork.client import QThreadedClient
 
 IP = "127.0.0.1"
 PORT = 7890
-KEY = b""
 
 
 class Main(QObject):
@@ -23,18 +22,17 @@ class Main(QObject):
         self.cln.message.connect(self.client_data_received)
         self.cln.failed_to_connect.connect(self.close)
         self.cln.disconnected.connect(self.close)
-        self.cln.start(IP, PORT, KEY)
+        self.cln.start(IP, PORT)
 
-    @Slot(dict)
-    def client_data_received(self, data: dict):
-        if data.get("data") == "Hello world!":
-            self.logger.info("Received Hello world!, closing client!")
-            self.close()
+    @Slot(bytes)
+    def client_data_received(self, data: bytes):
+        self.logger.info(data)
+        self.cln.write(b"Kick me plz")
 
     @Slot()
     def close(self):
         self.cln.close()
-        while self.cln.isRunning():
+        while self.cln.is_running():
             self.cln.wait()
         QApplication.instance().quit()
 
