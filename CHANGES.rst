@@ -1,6 +1,14 @@
 Changelog
 =========
 
+- 0.5.0:
+    - Add `kick` method for Device
+    - Emit Device instead of device_id on signals: connected, disconnected, message, error
+    - Remove JSON encoding
+    - Remove Fernet encryption
+    - Send `bytes` instead of `dict`
+    - Use `joined_lower` for function names
+
 - 0.4.4:
     - Fix tox build workflow
     - Fix generating changelog
