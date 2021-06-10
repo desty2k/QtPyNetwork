@@ -20,7 +20,7 @@ Changelog
     - Add info about project to readme
     - Restore old key after clearing custom encryption key
 
-- 0.4:
+- 0.4.0:
     - Fix large messages not being received
     - Add method to set encryption key for client
     - Add method to set custom JSON encoder and decoder
@@ -28,15 +28,15 @@ Changelog
     - Remove messages logging
     - Clean the code
 
-- 0.3:
+- 0.3.0:
     - Clean the code
     - Automatically remove clients and threads on disconnection
     - Update functions names
 
-- 0.2:
+- 0.2.0:
     - Update imports for Device model
     - Add logger name kwarg
 
-- 0.1:
+- 0.1.0:
     - Initial version
     - Create repo
