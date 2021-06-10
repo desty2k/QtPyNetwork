@@ -1,11 +1,9 @@
 from qtpy.QtCore import Slot, Signal, QObject, QThread, Qt
 from qtpy.QtNetwork import QTcpSocket
 
-import json
 import struct
 import logging
 
-from QtPyNetwork.core.crypto import encrypt, decrypt
 from QtPyNetwork.server.BaseServer import QBaseServer
 
 
@@ -15,39 +13,34 @@ class SocketWorker(QObject):
     Signals:
         - disconnected (device_id: int): Client disconnected.
         - connected (device_id: int, ip: str, port: int): Client connected
-        - message (device_id: int, message: dict): Message from client.
+        - message (device_id: int, message: bytes): Message from client.
         - error (device_id: int, error: str): Error occured.
         - closed (): Closed successfully.
-        - send (device_id: int, message: dict): Emit to send message
+        - send (device_id: int, message: bytes): Emit to send message
         to client with ID in this thread.
-        - send (message: dict): Emit to send message
+        - send (message: bytes): Emit to send message
         to all clients in this thread.
     """
 
     disconnected = Signal(int)
     connected = Signal(int, str, int)
-    message = Signal(int, dict)
+    message = Signal(int, bytes)
     error = Signal(int, str)
     closed = Signal()
 
     connection = Signal(int, int)
     close_signal = Signal()
 
-    write = Signal(int, dict)
-    writeAll = Signal(dict)
+    write = Signal(int, bytes)
+    write_all = Signal(bytes)
     kick = Signal(int)
 
-    json_encoder = None
-    json_decoder = None
-
-    def __init__(self, key=b"", parent=None):
+    def __init__(self, parent=None):
         super(SocketWorker, self).__init__(parent)
-        self.key = key
 
     @Slot()
     def start(self) -> None:
         """Run socket worker."""
-        self.keys = {}  # noqa
         self.sockets = []  # noqa
         self.data = {}  # noqa
         self.__logger = logging.getLogger(self.__class__.__name__)  # noqa
@@ -56,70 +49,40 @@ class SocketWorker(QObject):
         self.close_signal.connect(self.close, Qt.BlockingQueuedConnection)
 
         self.write.connect(self._write)
-        self.writeAll.connect(self._writeAll)
+        self.write_all.connect(self._write_all)
         self.kick.connect(self._kick)
 
     @Slot(int)
     def _kick(self, device_id):
         self.get_socket_by_id(device_id).close()
 
-    @Slot(int, dict)
-    def _write(self, device_id: int, msg: dict):
+    @Slot(int, bytes)
+    def _write(self, device_id: int, message: bytes):
         """Send task to client. DO NOT USE THIS! Emit write signal instead!
 
         Args:
             device_id (int): Client ID.
-            msg (dict): Message to send.
+            message (bytes): Message to send.
         """
         socket = self.get_socket_by_id(int(device_id))
         if socket:
-            device_id = int(socket.objectName())
-            try:
-                if self.json_encoder:
-                    message = json.dumps(msg, cls=self.json_encoder)
-                else:
-                    message = json.dumps(msg)
-
-                message = message.encode()
-                if device_id in self.keys:
-                    message = encrypt(message, self.keys.get(device_id))
-                elif self.key:
-                    message = encrypt(message, self.key)
-
-                message = struct.pack('!L', len(message)) + message
-                socket.write(message)
-                socket.flush()
-            except json.JSONDecodeError as e:
-                self.__logger.error("CLIENT-{} Could not encode message: {}".format(device_id, e))
+            message = struct.pack('!L', len(message)) + message
+            socket.write(message)
+            socket.flush()
         else:
             self.__logger.warning("Could not find socket with specified ID.")
 
-    @Slot(dict)
-    def _writeAll(self, msg: dict):
-        """Send task to all connected clients. DO NOT USE THIS! Emit writeAll signal instead!
+    @Slot(bytes)
+    def _write_all(self, message: bytes):
+        """Send task to all connected clients. DO NOT USE THIS! Emit write_all signal instead!
 
         Args:
-            msg (dict): Message to send.
+            message (bytes): Message to send.
         """
         for socket in self.sockets:
-            device_id = int(socket.objectName())
-            try:
-                if self.json_encoder:
-                    message = json.dumps(msg, cls=self.json_encoder)
-                else:
-                    message = json.dumps(msg)
-                message = message.encode()
-
-                if device_id in self.keys:
-                    message = encrypt(message, self.keys.get(device_id))
-                elif self.key:
-                    message = encrypt(message, self.key)
-
-                message = struct.pack('!L', len(message)) + message
-                socket.write(message)
-                socket.flush()
-            except json.JSONDecodeError as e:
-                pass
+            message = struct.pack('!L', len(message)) + message
+            socket.write(message)
+            socket.flush()
 
     @Slot(int)
     def get_socket_by_id(self, device_id: int):
@@ -151,21 +114,6 @@ class SocketWorker(QObject):
             device_id (int): Socket ID.
         """
         return int(device_id) in [int(socket.objectName()) for socket in self.sockets]
-
-    @Slot(int, bytes)
-    def setCustomKeyForClient(self, bot_id: int, key: bytes):
-        """Sets custom encryption key for one client."""
-        self.keys[bot_id] = key
-
-    @Slot(int)
-    def removeCustomKeyForClient(self, bot_id: int):
-        """Removes custom key for client."""
-        del self.keys[bot_id]
-
-    @Slot()
-    def clearCustomKeys(self):
-        """Removes custom key for all clients."""
-        self.keys = {}  # noqa
 
     @Slot(int, int)
     def on_connection(self, device_id: int, socket_descriptor: int):
@@ -210,7 +158,7 @@ class SocketWorker(QObject):
                 else:
                     message = self.data.get(device_id).get("data") + message
                     del self.data[device_id]
-                    self.__process_message(device_id, message)
+                    self.message.emit(device_id, message)
 
             else:
                 header_size = struct.calcsize('!L')
@@ -223,24 +171,7 @@ class SocketWorker(QObject):
                         msg_size = msg_size - len(message)
                         self.data[device_id] = {"data": message, "size_left": msg_size}
                     else:
-                        self.__process_message(device_id, message)
-
-    @Slot(bytes)
-    def __process_message(self, device_id, message):
-        if device_id in self.keys:
-            message = decrypt(message, self.keys.get(device_id))
-        elif self.key:
-            message = decrypt(message, self.key)
-
-        message = message.decode()
-        try:
-            if self.json_decoder:
-                message = json.loads(message, cls=self.json_decoder)
-            else:
-                message = json.loads(message)
-            self.message.emit(device_id, message)
-        except json.JSONDecodeError as e:
-            self.error.emit("Failed to decode message from {}: {}: {}".format(device_id, message, e))
+                        self.message.emit(device_id, message)
 
     @Slot(QTcpSocket)
     def on_disconnected(self, conn):
@@ -259,8 +190,6 @@ class SocketWorker(QObject):
                 self.sockets.remove(conn)
             except RuntimeError:
                 pass
-        if device_id in self.keys:
-            del self.keys[device_id]
         if device_id in self.data:
             del self.data[device_id]
         self.__logger.info("CLIENT-{} Disconnected {}: {}:{}".format(device_id, conn.peerName(),
@@ -307,7 +236,7 @@ class BalancedSocketHandler(QObject):
     Signals:
         - started (): Handler started.
         - finished (): Handler finished.
-        - message (device_id: int, message: dict): Message received.
+        - message (device_id: int, message: bytes): Message received.
         - close_signal (): Emit this to close handler from another thread.
         - connection (device_id: int): New connection.
     """
@@ -316,18 +245,17 @@ class BalancedSocketHandler(QObject):
     close_signal = Signal()
 
     connected = Signal(int, str, int)
-    message = Signal(int, dict)
+    message = Signal(int, bytes)
     error = Signal(int, str)
     disconnected = Signal(int)
 
-    write = Signal(int, dict)
-    writeAll = Signal(dict)
+    write = Signal(int, bytes)
+    write_all = Signal(bytes)
     kick = Signal(int)
 
-    def __init__(self, cores=None, key=None):
+    def __init__(self, cores=None):
         super(BalancedSocketHandler, self).__init__(None)
         self.cores = cores
-        self.key = key
 
     @Slot()
     def start(self):
@@ -340,7 +268,7 @@ class BalancedSocketHandler(QObject):
 
         self.close_signal.connect(self.close, Qt.BlockingQueuedConnection)
         self.write.connect(self._write)
-        self.writeAll.connect(self._writeAll)
+        self.write_all.connect(self._write_all)
         self.kick.connect(self._kick)
         self.__logger.debug("Allocating {} worker threads...".format(self.cores))
 
@@ -359,7 +287,7 @@ class BalancedSocketHandler(QObject):
     @Slot()
     def create_worker(self):
         thread = QThread()
-        worker = SocketWorker(self.key)
+        worker = SocketWorker()
         worker.moveToThread(thread)
 
         worker.connected.connect(self.connected.emit)  # noqa
@@ -388,17 +316,17 @@ class BalancedSocketHandler(QObject):
         device_id = self.get_free_id()
         self.workers[worker_id].connection.emit(device_id, socket_descriptor)
 
-    @Slot(int, dict)
-    def _write(self, device_id: int, msg: dict) -> None:
+    @Slot(int, bytes)
+    def _write(self, device_id: int, message: bytes) -> None:
         """Write to client with ID.
 
         Args:
             device_id (int): Client ID.
-            msg (dict): Message.
+            message (bytes): Message.
         """
         for worker in self.workers:
             if worker.has_device_id(device_id):
-                worker.write.emit(device_id, msg)
+                worker.write.emit(device_id, message)
                 return
         self.__logger.error("Could not find client with ID: {}!".format(device_id))
 
@@ -415,15 +343,15 @@ class BalancedSocketHandler(QObject):
                 return
         self.__logger.error("Could not find client with ID: {}!".format(device_id))
 
-    @Slot(dict)
-    def _writeAll(self, msg: dict) -> None:
+    @Slot(bytes)
+    def _write_all(self, message: bytes) -> None:
         """Write to all clients
 
         Args:
-            msg (dict): Message.
+            message (bytes): Message.
         """
         for worker in self.workers:
-            worker.writeAll.emit(msg)
+            worker.write_all.emit(message)
 
     @Slot()
     def get_free_id(self) -> int:
@@ -440,34 +368,6 @@ class BalancedSocketHandler(QObject):
             return maxid + 1
         else:
             return 1
-
-    @Slot(int, bytes)
-    def setCustomKeyForClient(self, bot_id: int, key: bytes):
-        """Sets custom encryption key for one client."""
-        for worker in self.workers:
-            if worker.has_device_id(bot_id):
-                worker.setCustomKeyForClient(bot_id, key)
-
-    @Slot(int)
-    def removeCustomKeyForClient(self, bot_id: int):
-        """Removes custom key for client."""
-        for worker in self.workers:
-            if worker.has_device_id(bot_id):
-                worker.removeCustomKeyForClient(bot_id)
-
-    @Slot()
-    def clearCustomKeys(self):
-        """Removes custom key for all clients."""
-        for worker in self.workers:
-            worker.clearCustomKeys()
-
-    @Slot(json.JSONEncoder)
-    def setJSONEncoder(self, encoder):
-        SocketWorker.json_encoder = encoder
-
-    @Slot(json.JSONDecoder)
-    def setJSONDecoder(self, decoder):
-        SocketWorker.json_decoder = decoder
 
     @Slot()
     def close(self) -> None:
@@ -488,4 +388,4 @@ class BalancedSocketHandler(QObject):
 class QBalancedServer(QBaseServer):
     def __init__(self, *args, **kwargs):
         super(QBalancedServer, self).__init__(*args, **kwargs)
-        self.setHandlerClass(BalancedSocketHandler)
+        self.set_handler_class(BalancedSocketHandler)

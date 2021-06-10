@@ -5,31 +5,25 @@ import logging
 from qtpy.QtNetwork import QTcpSocket, QHostAddress, QAbstractSocket
 from qtpy.QtCore import QObject, QIODevice, Signal, QMetaObject, Slot, QThread, Qt
 
-from QtPyNetwork.core.crypto import encrypt, decrypt
-
 
 class SocketClient(QObject):
     closed = Signal()
     connected = Signal(str, int)
-    message = Signal(dict)
+    message = Signal(bytes)
     disconnected = Signal()
     error = Signal(str)
     failed_to_connect = Signal(str, int)
 
     close_signal = Signal()
-    write_signal = Signal(dict)
-    connect_signal = Signal(str, int, bytes)
+    write_signal = Signal(bytes)
+    reconnect_signal = Signal()
+    connect_signal = Signal(str, int)
     disconnect_signal = Signal()
 
-    json_encoder = None
-    json_decoder = None
-
-    def __init__(self, ip: str, port: int, key: bytes, loggerName=None):
+    def __init__(self, ip: str, port: int, loggerName=None):
         super(SocketClient, self).__init__(None)
         self.ip = ip
         self.port = port
-        self.key = key
-        self.old_key = key
         self.logger_name = loggerName
 
     @Slot()
@@ -56,17 +50,11 @@ class SocketClient(QObject):
         self.write_signal.connect(self._write)
         self.connect_signal.connect(self._connectTo)
         self.disconnect_signal.connect(self._disconnect)
+        self.reconnect_signal.connect(self._reconnect)
 
-    @Slot(dict)
-    def _write(self, message: dict):
+    @Slot(bytes)
+    def _write(self, message: bytes):
         """Write dict to server"""
-        if self.json_encoder:
-            message = json.dumps(message, cls=self.json_encoder)
-        else:
-            message = json.dumps(message)
-        message = message.encode()
-        if self.key:
-            message = encrypt(message, self.key)
         message = struct.pack('!L', len(message)) + message
         self.tcpSocket.write(message)
         self.tcpSocket.flush()
@@ -88,20 +76,6 @@ class SocketClient(QObject):
         self.logger.info("Disconnected from server")
         self.disconnected.emit()
 
-    @Slot(bytes)
-    def __process_message(self, message):
-        if self.key:
-            message = decrypt(message, self.key)
-        message = message.decode()
-        try:
-            if self.json_decoder:
-                message = json.loads(message, cls=self.json_decoder)
-            else:
-                message = json.loads(message)
-            self.message.emit(message)
-        except json.JSONDecodeError as e:
-            self.error.emit("Failed to decode {}: {}".format(message, e))
-
     @Slot()
     def on_qclient_socket_readyRead(self):
         while self.tcpSocket.bytesAvailable():
@@ -116,7 +90,7 @@ class SocketClient(QObject):
                     message = self.data.get("data") + message
                     self.data["size_left"] = 0
                     self.data["data"] = b""
-                    self.__process_message(message)
+                    self.message.emit(message)
             else:
                 header_size = struct.calcsize('!L')
                 header = self.tcpSocket.read(header_size)
@@ -129,25 +103,19 @@ class SocketClient(QObject):
                         self.data["data"] = message
                         self.data["size_left"] = msg_size
                     else:
-                        self.__process_message(message)
+                        self.message.emit(message)
 
-    @Slot(bytes)
-    def setCustomKey(self, key: bytes):
-        """Sets custom encryption key."""
-        self.key = key
-
-    @Slot()
-    def clearCustomKey(self):
-        """Removes custom key."""
-        self.key = self.old_key
-
-    @Slot(str, int, bytes)
-    def _connectTo(self, ip: str, port: int, key: bytes):
+    @Slot(str, int)
+    def _connectTo(self, ip: str, port: int):
         self._disconnect()
         self.ip = ip
         self.port = port
-        self.key = key
-        self.run()
+        self.start()
+
+    @Slot()
+    def _reconnect(self):
+        self._disconnect()
+        self.start()
 
     @Slot()
     def _disconnect(self):
@@ -174,15 +142,16 @@ class QThreadedClient(QObject):
 
     Available slots:
         - start(): Start client.
-        - write(data: dict): Write message to server.
+        - write(data: bytes): Write message to server.
+        - reconnect(): Reconnect to server.
         - close(): Close connection.
-        - disconnectFromServer(): Disconnect from server.
-        - connectTo(ip: str, port: int, key: bytes): (Re)connect to server.
+        - disconnect_from_server(): Disconnect from server.
+        - connect_to(ip: str, port: int): (Re)connect to server.
     """
     finished = Signal()
     closed = Signal()
     connected = Signal(str, int)
-    message = Signal(dict)
+    message = Signal(bytes)
     disconnected = Signal()
     error = Signal(str)
     failed_to_connect = Signal(str, int)
@@ -191,20 +160,18 @@ class QThreadedClient(QObject):
         super(QThreadedClient, self).__init__(None)
         self.__ip = None
         self.__port = None
-        self.__key = None
 
         self.__client = None
         self.__client_thread = None
         self.__logger_name = loggerName
 
-    @Slot()
-    def start(self, ip: str, port: int, key: bytes):
+    @Slot(str, int)
+    def start(self, ip: str, port: int):
         """Start client thread and connect to server."""
         self.__ip = ip
         self.__port = port
-        self.__key = key
 
-        self.__client = SocketClient(self.__ip, self.__port, self.__key, loggerName=self.__logger_name)
+        self.__client = SocketClient(self.__ip, self.__port, loggerName=self.__logger_name)
         self.__client_thread = QThread()
 
         self.__client_thread.started.connect(self.__client.start)
@@ -221,38 +188,14 @@ class QThreadedClient(QObject):
 
         self.__client_thread.start()
 
-    @Slot(dict)
-    def write(self, data: dict):
-        """write data to server.
+    @Slot(bytes)
+    def write(self, data: bytes):
+        """Write data to server.
 
         Args:
-            data (dict): Data to write.
+            data (bytes): Data to write.
         """
         self.__client.write_signal.emit(data)
-
-    @Slot(bytes)
-    def setCustomKey(self, key: bytes):
-        """Sets custom encryption key."""
-        if self.__client and self.__client_thread:
-            self.__client.setCustomKey(key)
-        else:
-            self.error.emit("Failed to set custom key - client not running")
-
-    @Slot()
-    def clearCustomKey(self):
-        """Removes custom key."""
-        if self.__client and self.__client_thread:
-            self.__client.clearCustomKey()
-        else:
-            self.error.emit("Failed to clear custom key - client not running")
-
-    @Slot(json.JSONEncoder)
-    def setJSONEncoder(self, encoder):
-        SocketClient.json_encoder = encoder
-
-    @Slot(json.JSONDecoder)
-    def setJSONDecoder(self, decoder):
-        SocketClient.json_decoder = decoder
 
     @Slot()
     def close(self):
@@ -264,27 +207,34 @@ class QThreadedClient(QObject):
             self.error.emit("Client not running")
 
     @Slot()
-    def disconnectFromServer(self):
+    def disconnect_from_server(self):
         """Disconnect from server."""
         self.__client.disconnect_signal.emit()
 
-    @Slot(str, int, bytes)
-    def connectTo(self, ip: str, port: int, key: bytes):
+    @Slot(str, int)
+    def connect_to(self, ip: str, port: int):
         """(Re)connect to server.
 
         Args:
             ip (str): IP address.
             port (int): Port.
-            key (bytes): Encryption key.
         """
-        self.__client.connect_signal.emit(ip, port, key)
+        self.__client.connect_signal.emit(ip, port)
 
     @Slot()
-    def isRunning(self):
+    def reconnect(self):
+        self.__client.reconnect_signal.emit()
+
+    @Slot()
+    def is_running(self):
         """Check if server is running"""
-        return self.__client_thread.isRunning()
+        if self.__client_thread:
+            return self.__client_thread.isRunning()
+        return False
 
     @Slot()
     def wait(self):
         """Wait for server thread to finish."""
-        return self.__client_thread.wait()
+        if self.__client_thread:
+            return self.__client_thread.wait()
+        return True

@@ -1,10 +1,9 @@
 from qtpy.QtCore import Slot, Signal, QObject, QThread
 from qtpy.QtNetwork import QTcpServer, QHostAddress
 
-
 from QtPyNetwork.models import Device
+from QtPyNetwork.exceptions import NotConnectedError
 
-import json
 import logging
 
 
@@ -22,10 +21,12 @@ class TCPServer(QTcpServer):
 
 class QBaseServer(QObject):
     """Server base for QtPyNetwork."""
-    connected = Signal(int, str, int)
-    message = Signal(int, dict)
-    disconnected = Signal(int)
-    error = Signal(int, str)
+    connected = Signal(Device, str, int)
+    disconnected = Signal(Device)
+    message = Signal(Device, bytes)
+    error = Signal(Device, str)
+
+    server_error = Signal(str)
     closed = Signal()
 
     def __init__(self, loggerName=None):
@@ -46,14 +47,14 @@ class QBaseServer(QObject):
         self.__server = None
 
     @Slot(str, int, bytes)
-    def start(self, ip: str, port: int, key: bytes = b""):
+    def start(self, ip: str, port: int):
         """Start server on IP:Port and decrypt incomming and
         outcomming messages with encryption key."""
         if self.__handlerClass:
             ip = QHostAddress(ip)
             self.__ip = ip
             self.__port = port
-            self.__handler = self.__handlerClass(key=key)
+            self.__handler = self.__handlerClass()
             self.__handler_thread = QThread()
             self.__handler.moveToThread(self.__handler_thread)
 
@@ -78,51 +79,59 @@ class QBaseServer(QObject):
         else:
             e = self.__server.errorString()
             self.__logger.error(e)
-            self.error.emit(0, e)
+            self.server_error.emit(e)
 
     @Slot(int, str, int)
     def on_successful_connection(self, device_id, ip, port):
         """When client connects to server successfully."""
         device = self.__deviceModel(device_id, ip, port)
-        device._write.connect(self.write)
+        device._write.connect(lambda data: self.write(device, data))
+        device._kick.connect(lambda: self.kick(device))
         self.__devices.append(device)
-        self.connected.emit(device_id, ip, port)
+        self.connected.emit(device, ip, port)
         self.__logger.info("Added new CLIENT-{} with address {}:{}".format(device_id, ip, port))
 
-    @Slot(int, dict)
-    def on_message(self, device_id: int, message: dict):
+    @Slot(int, bytes)
+    def on_message(self, device_id: int, message: bytes):
         """When server receives message from bot."""
-        self.message.emit(device_id, message)
+        self.message.emit(self.get_device_by_id(device_id), message)
 
     @Slot(int)
     def on_device_disconnected(self, device_id):
         """When bot disconnects from server."""
-        self.__devices.remove(self.getDeviceById(device_id))
-        self.disconnected.emit(device_id)
+        device = self.get_device_by_id(device_id)
+        device.set_connected(False)
+        if device in self.__devices:
+            self.__devices.remove(device)
+        self.disconnected.emit(device)
 
-    @Slot(int, dict)
-    def write(self, device_id: int, data: dict):
-        """Write data to device with specified ID."""
+    @Slot(Device, bytes)
+    def write(self, device: Device, data: bytes):
+        """Write data to device."""
         if not self.__server or not self.__handler:
             self.__logger.error("Start() server before sending data!")
             return
-        self.__handler.write.emit(device_id, data)
+        if not device.is_connected():
+            raise NotConnectedError("Client is not connected")
+        self.__handler.write.emit(device.get_id(), data)
 
-    @Slot(int)
-    def kick(self, device_id):
-        """Disconnect device from server."""
-        if not self.__server or not self.__handler:
-            self.__logger.error("Server not running!")
-            return
-        self.__handler.kick.emit(device_id)
-
-    @Slot(dict)
-    def writeAll(self, data: dict):
+    @Slot(bytes)
+    def write_all(self, data: bytes):
         """Write data to all devices."""
         if not self.__server or not self.__handler:
             self.__logger.error("Start() server before sending data!")
             return
-        self.__handler.writeAll.emit(data)
+        self.__handler.write_all.emit(data)
+
+    @Slot()
+    def kick(self, device: Device):
+        """Disconnect device from server."""
+        if not self.__server or not self.__handler:
+            self.__logger.error("Server not running!")
+            return
+        if not device.is_connected():
+            raise NotConnectedError("Client is not connected")
+        self.__handler.kick.emit(device.get_id())
 
     @Slot()
     def close(self):
@@ -134,47 +143,13 @@ class QBaseServer(QObject):
             self.__handler.close()
             self.__handler_thread.quit()
 
-    @Slot(int, bytes)
-    def setCustomKeyForClient(self, bot_id: int, key: bytes):
-        """Sets custom encryption key for one client."""
-        if not self.isRunning():
-            raise Exception("Failed to set custom key for client - server not running!")
-
-        self.__handler.setCustomKeyForClient(bot_id, key)
-
-    @Slot(int)
-    def removeCustomKeyForClient(self, bot_id: int):
-        """Removes custom key for client."""
-        if not self.isRunning():
-            raise Exception("Failed to remove custom key for client - server not running!")
-        self.__handler.removeCustomKeyForClient(bot_id)
-
-    @Slot()
-    def clearCustomKeys(self):
-        """Removes custom key for all clients."""
-        if not self.isRunning():
-            raise Exception("Failed to clear custom keys - server not running!")
-        self.__handler.clearCustomKeys()
-
-    @Slot(json.JSONEncoder)
-    def setJSONEncoder(self, encoder):
-        if not self.isRunning():
-            raise Exception("Failed to set JSON encoder - server not running")
-        self.__handler.setJSONEncoder(encoder)
-
-    @Slot(json.JSONDecoder)
-    def setJSONDecoder(self, decoder):
-        if not self.isRunning():
-            raise Exception("Failed to set JSON decoder - server not running")
-        self.__handler.setJSONDecoder(decoder)
-
-    def setDeviceModel(self, model):
+    def set_device_model(self, model):
         """Set model to use for device when client connects.
 
         Note:
             Model should be subclassing Device.
         """
-        if self.isRunning():
+        if self.is_running():
             raise Exception("Set device model before starting server!")
 
         if not issubclass(model, Device):
@@ -187,7 +162,7 @@ class QBaseServer(QObject):
 
         self.__deviceModel = model
 
-    def isRunning(self):
+    def is_running(self):
         """Check if server is running."""
         if self.__handler_thread:
             return self.__handler_thread.isRunning()
@@ -197,9 +172,10 @@ class QBaseServer(QObject):
         """Wait for server thread to finish."""
         if self.__handler_thread:
             return self.__handler_thread.wait()
+        return True
 
     @Slot(int)
-    def getDeviceById(self, device_id: int) -> Device:
+    def get_device_by_id(self, device_id: int) -> Device:
         """Returns device with associated ID.
 
         Args:
@@ -210,17 +186,17 @@ class QBaseServer(QObject):
                 return device
         raise Exception("CLIENT-{} not found".format(device_id))
 
-    def getDevices(self):
+    def get_devices(self):
         """Returns list with devices."""
         return self.__devices
 
-    def setHandlerClass(self, handler):
+    def set_handler_class(self, handler):
         """Set handler to use. This should not be used
         outside this library."""
-        if self.isRunning():
+        if self.is_running():
             raise Exception("Set socket handler before starting server!")
         try:
-            handler(key=b"")
+            handler()
         except TypeError as e:
             raise TypeError("Handler is not valid class! Exception: {}".format(e))
         self.__handlerClass = handler
