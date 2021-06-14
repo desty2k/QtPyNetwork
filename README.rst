@@ -1,6 +1,8 @@
 QtPyNetwork
 ===========
 
+|Build Status|  |PyPI Downloads|
+
 QtPyNetwork is a small abstraction layer for sending and receiving messages using TCP sockets.
 
 There are two servers available:
@@ -74,3 +76,8 @@ QBalancedServer
         main.start()
         sys.exit(app.exec_())
 
+
+.. |Build Status| image:: https://github.com/desty2k/QtPyNetwork/actions/workflows/build.yml/badge.svg
+   :target: https://github.com/desty2k/QtPyNetwork/actions/workflows/build.yml
+.. |PyPI Downloads| image:: https://img.shields.io/pypi/dm/qtpynetwork
+   :target: https://pypi.org/project/QtPyNetwork/
