@@ -58,10 +58,10 @@ class QBaseServer(QObject):
             self.__handler_thread = QThread()
             self.__handler.moveToThread(self.__handler_thread)
 
-            self.__handler.connected.connect(self.on_successful_connection)
-            self.__handler.message.connect(self.on_message)
-            self.__handler.error.connect(self.error.emit)
-            self.__handler.disconnected.connect(self.on_device_disconnected)
+            self.__handler.connected.connect(self.__on_handler_successful_connection)
+            self.__handler.message.connect(self.__on_handler_device_message)
+            self.__handler.error.connect(self.__on_handler_device_error)
+            self.__handler.disconnected.connect(self.__on_handler_device_disconnected)
             self.__handler.closed.connect(self.on_closed)
 
             self.__handler_thread.started.connect(self.__handler.start)
@@ -83,29 +83,48 @@ class QBaseServer(QObject):
             self.server_error.emit(e)
 
     @Slot(int, str, int)
-    def on_successful_connection(self, device_id, ip, port):
+    def __on_handler_successful_connection(self, device_id, ip, port):
         """When client connects to server successfully."""
         device = self.__deviceModel(device_id, ip, port)
         device._write.connect(lambda data: self.write(device, data))
         device._kick.connect(lambda: self.kick(device))
         self.__devices.append(device)
-        self.connected.emit(device, ip, port)
         self.__logger.info("Added new CLIENT-{} with address {}:{}".format(device_id, ip, port))
+        self.on_connected(device, ip, port)
 
     @Slot(int, bytes)
-    def on_message(self, device_id: int, message: bytes):
+    def __on_handler_device_message(self, device_id: int, message: bytes):
         """When server receives message from bot."""
-        self.message.emit(self.get_device_by_id(device_id), message)
+        self.on_message(self.get_device_by_id(device_id), message)
 
     @Slot(int)
-    def on_device_disconnected(self, device_id):
+    def __on_handler_device_disconnected(self, device_id):
         """When bot disconnects from server."""
         device = self.get_device_by_id(device_id)
         device.set_connected(False)
         if device in self.__devices:
             self.__devices.remove(device)
+        self.on_disconnected(device)
+
+    @Slot(int, str)
+    def __on_handler_device_error(self, device_id, error):
+        self.on_error(self.get_device_by_id(device_id), error)
+
+    @Slot(Device, str, int)
+    def on_connected(self, device: Device, ip: str, port: int):
+        self.connected.emit(device, ip, port)
+
+    @Slot(Device, bytes)
+    def on_message(self, device: Device, message: bytes):
+        self.message.emit(device, message)
+
+    @Slot(Device)
+    def on_disconnected(self, device: Device):
         self.disconnected.emit(device)
 
+    @Slot(Device, str)
+    def on_error(self, device: Device, error: str):
+        self.error.emit(device, error)
 
     @Slot()
     def on_closed(self):

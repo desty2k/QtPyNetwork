@@ -179,14 +179,38 @@ class QThreadedClient(QObject):
 
         self.__client.moveToThread(self.__client_thread)
 
-        self.__client.connected.connect(self.connected.emit)
-        self.__client.failed_to_connect.connect(self.failed_to_connect.emit)
-        self.__client.message.connect(self.message.emit)
-        self.__client.disconnected.connect(self.disconnected.emit)
-        self.__client.error.connect(self.error.emit)
-        self.__client.closed.connect(self.closed.emit)
+        self.__client.connected.connect(self.on_connected)
+        self.__client.failed_to_connect.connect(self.on_failed_to_connect)
+        self.__client.message.connect(self.on_message)
+        self.__client.disconnected.connect(self.on_disconnected)
+        self.__client.error.connect(self.on_error)
+        self.__client.closed.connect(self.on_closed)
 
         self.__client_thread.start()
+
+    @Slot(str, int)
+    def on_connected(self, ip, port):
+        self.connected.emit(ip, port)
+
+    @Slot(str, int)
+    def on_failed_to_connect(self, ip, port):
+        self.failed_to_connect.emit(ip, port)
+
+    @Slot(bytes)
+    def on_message(self, message: bytes):
+        self.message.emit(message)
+
+    @Slot()
+    def on_disconnected(self):
+        self.disconnected.emit()
+
+    @Slot(str)
+    def on_error(self, error: str):
+        self.error.emit(error)
+
+    @Slot()
+    def on_closed(self):
+        self.closed.emit()
 
     @Slot(bytes)
     def write(self, data: bytes):
