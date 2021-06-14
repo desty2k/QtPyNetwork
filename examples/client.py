@@ -7,7 +7,7 @@ import logging
 from QtPyNetwork.client import QThreadedClient
 
 IP = "127.0.0.1"
-PORT = 7890
+PORT = 12500
 
 
 class Main(QObject):

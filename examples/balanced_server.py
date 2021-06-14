@@ -9,7 +9,7 @@ from QtPyNetwork.server import QBalancedServer
 from QtPyNetwork.models import Device
 
 IP = "127.0.0.1"
-PORT = 7890
+PORT = 12500
 
 
 class Main(QObject):
