@@ -150,7 +150,7 @@ class ThreadedSocketHandler(QObject):
         - connection (client_id: int): New connection.
     """
     started = Signal()
-    finished = Signal()
+    closed = Signal()
     close_signal = Signal()
 
     connected = Signal(int, str, int)
@@ -286,7 +286,7 @@ class ThreadedSocketHandler(QObject):
         """Close server and disconnect all clients.
 
         Note:
-            Emits finished signal when successfully closed.
+            Emits closed signal when successfully closed.
         """
         for client in self.clients:
             client.close_signal.emit()
@@ -295,7 +295,7 @@ class ThreadedSocketHandler(QObject):
             thread.quit()
 
         self._logger.debug("Socket handler closed successfully")
-        self.finished.emit()
+        self.closed.emit()
 
 
 class QThreadedServer(QBaseServer):

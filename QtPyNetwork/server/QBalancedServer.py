@@ -235,13 +235,13 @@ class BalancedSocketHandler(QObject):
 
     Signals:
         - started (): Handler started.
-        - finished (): Handler finished.
+        - closed (): Handler closed.
         - message (device_id: int, message: bytes): Message received.
         - close_signal (): Emit this to close handler from another thread.
         - connection (device_id: int): New connection.
     """
     started = Signal()
-    finished = Signal()
+    closed = Signal()
     close_signal = Signal()
 
     connected = Signal(int, str, int)
@@ -374,7 +374,7 @@ class BalancedSocketHandler(QObject):
         """Close server and all socket handlers.
 
         Note:
-            Emits finished signal when successfully closed.
+            Emits closed signal when successfully closed.
         """
         for worker in self.workers:
             worker.close_signal.emit()
@@ -382,7 +382,7 @@ class BalancedSocketHandler(QObject):
         for thread in self.threads:
             thread.quit()
         self.__logger.debug("Socket handler closed successfully")
-        self.finished.emit()
+        self.closed.emit()
 
 
 class QBalancedServer(QBaseServer):

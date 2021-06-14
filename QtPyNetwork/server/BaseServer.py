@@ -62,6 +62,7 @@ class QBaseServer(QObject):
             self.__handler.message.connect(self.on_message)
             self.__handler.error.connect(self.error.emit)
             self.__handler.disconnected.connect(self.on_device_disconnected)
+            self.__handler.closed.connect(self.on_closed)
 
             self.__handler_thread.started.connect(self.__handler.start)
             self.__handler.started.connect(self.__setup_server)
@@ -104,6 +105,11 @@ class QBaseServer(QObject):
         if device in self.__devices:
             self.__devices.remove(device)
         self.disconnected.emit(device)
+
+
+    @Slot()
+    def on_closed(self):
+        self.closed.emit()
 
     @Slot(Device, bytes)
     def write(self, device: Device, data: bytes):
