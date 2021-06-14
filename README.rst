@@ -28,12 +28,16 @@ Usage
 
 See examples directory for client and server code samples.
 
-QBalancedServer
-~~~~~~~~~~~~~~~
+Server
+~~~~~~
+
+You can use both composition and inheritance to use server.
+
+Composition
+^^^^^^^^^^^
 
 .. code-block:: python
 
-    from qtpy.QtWidgets import QApplication
     from qtpy.QtCore import QObject, Slot, QCoreApplication
 
     import sys
@@ -44,12 +48,15 @@ QBalancedServer
 
     IP, PORT = "127.0.0.1", 12500
 
+
     class Main(QObject):
 
         def __init__(self):
             super(Main, self).__init__(None)
+            self.logger = logging.getLogger(self.__class__.__name__)
 
-        def start()
+        @Slot()
+        def start():
             self.srv = QBalancedServer()
             self.srv.connected.connect(self.on_connected)
             self.srv.disconnected.connect(self.on_disconnected)
@@ -57,7 +64,7 @@ QBalancedServer
             self.srv.start(IP, PORT)
 
         @Slot(Device)
-        def on_connected(device: Device)
+        def on_connected(device: Device):
             self.logger.info("New device connected: {}".format(device.get_id()))
 
         @Slot(Device, bytes)
@@ -74,6 +81,49 @@ QBalancedServer
         app = QCoreApplication(sys.argv)
         main = Main()
         main.start()
+        sys.exit(app.exec_())
+
+
+Inheritance
+^^^^^^^^^^^
+
+.. code-block:: python
+
+    from qtpy.QtCore import QObject, Slot, QCoreApplication
+
+    import sys
+    import logging
+
+    from QtPyNetwork.server import QBalancedServer
+    from QtPyNetwork.models import Device
+
+    IP, PORT = "127.0.0.1", 12500
+
+
+    class Main(QBalancedServer):
+
+        def __init__(self):
+            super(Main, self).__init__(None)
+            self.logger = logging.getLogger(self.__class__.__name__)
+
+        @Slot(Device)
+        def on_connected(device: Device):
+            self.logger.info("New device connected: {}".format(device.get_id()))
+
+        @Slot(Device, bytes)
+        def on_message(self, device: Device, message: bytes):
+            self.logger.info("Received from {}: {}".format(device.get_id(), message))
+
+        @Slot(Device)
+        def on_disconnected(self, device: Device):
+            self.logger.info("Device {} disconnected".format(device.get_id()))
+            self.close()
+
+    if __name__ == '__main__':
+        logging.basicConfig(level=logging.NOTSET)
+        app = QCoreApplication(sys.argv)
+        main = Main()
+        main.start(IP, PORT)
         sys.exit(app.exec_())
 
 
