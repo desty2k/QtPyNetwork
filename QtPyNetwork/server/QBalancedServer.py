@@ -54,7 +54,11 @@ class SocketWorker(QObject):
 
     @Slot(int)
     def _kick(self, device_id):
-        self.get_socket_by_id(device_id).close()
+        socket = self.get_socket_by_id(device_id)
+        if socket:
+            socket.close()
+            return
+        self.__logger.error("Could not find socket with ID: {}!".format(device_id))
 
     @Slot(int, bytes)
     def _write(self, device_id: int, message: bytes):
