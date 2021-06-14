@@ -2,7 +2,7 @@ from qtpy.QtCore import Slot, Signal, QObject, QThread
 from qtpy.QtNetwork import QTcpServer, QHostAddress
 
 from QtPyNetwork.models import Device
-from QtPyNetwork.exceptions import NotConnectedError
+from QtPyNetwork.exceptions import NotConnectedError, ServerNotRunning
 
 import logging
 
@@ -115,8 +115,7 @@ class QBaseServer(QObject):
     def write(self, device: Device, data: bytes):
         """Write data to device."""
         if not self.__server or not self.__handler:
-            self.__logger.error("Start() server before sending data!")
-            return
+            raise ServerNotRunning("Server is not running")
         if not device.is_connected():
             raise NotConnectedError("Client is not connected")
         self.__handler.write.emit(device.get_id(), data)
@@ -125,16 +124,14 @@ class QBaseServer(QObject):
     def write_all(self, data: bytes):
         """Write data to all devices."""
         if not self.__server or not self.__handler:
-            self.__logger.error("Start() server before sending data!")
-            return
+            raise ServerNotRunning("Server is not running")
         self.__handler.write_all.emit(data)
 
     @Slot()
     def kick(self, device: Device):
         """Disconnect device from server."""
         if not self.__server or not self.__handler:
-            self.__logger.error("Server not running!")
-            return
+            raise ServerNotRunning("Server is not running")
         if not device.is_connected():
             raise NotConnectedError("Client is not connected")
         self.__handler.kick.emit(device.get_id())
@@ -175,7 +172,7 @@ class QBaseServer(QObject):
         return False
 
     def wait(self):
-        """Wait for server thread to finish."""
+        """Wait for server thread to close."""
         if self.__handler_thread:
             return self.__handler_thread.wait()
         return True
