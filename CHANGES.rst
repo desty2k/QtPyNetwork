@@ -1,15 +1,12 @@
 Changelog
 =========
 
-- 0.5.2:
-    - Update readme and examples (replace get_id() with id())
-    - Fix missing positional argument `device` in Device.write() method
-
 - 0.5.1:
     - Make all variables protected in Device class
     - Add positional argument `server` for Device model
     - Add getters for Device model: ip, port, etc.
     - Update write and kick methods for Device class, remove signals
+    - Update readme and examples (replace get_id() with id())
 
 - 0.5.0:
     - Add `kick` method for Device
