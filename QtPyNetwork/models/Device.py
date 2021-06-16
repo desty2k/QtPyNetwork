@@ -55,4 +55,3 @@ class Device(QObject):
     @Slot(bytes)
     def write(self, message: bytes):
         self.server().write(self, message)
-
