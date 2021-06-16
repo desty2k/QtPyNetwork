@@ -85,9 +85,7 @@ class QBaseServer(QObject):
     @Slot(int, str, int)
     def __on_handler_successful_connection(self, device_id, ip, port):
         """When client connects to server successfully."""
-        device = self.__deviceModel(device_id, ip, port)
-        device._write.connect(lambda data: self.write(device, data))
-        device._kick.connect(lambda: self.kick(device))
+        device = self.__deviceModel(self, device_id, ip, port)
         self.__devices.append(device)
         self.__logger.info("Added new CLIENT-{} with address {}:{}".format(device_id, ip, port))
         self.on_connected(device, ip, port)
@@ -137,7 +135,7 @@ class QBaseServer(QObject):
             raise ServerNotRunning("Server is not running")
         if not device.is_connected():
             raise NotConnectedError("Client is not connected")
-        self.__handler.write.emit(device.get_id(), data)
+        self.__handler.write.emit(device.id(), data)
 
     @Slot(bytes)
     def write_all(self, data: bytes):
@@ -153,7 +151,7 @@ class QBaseServer(QObject):
             raise ServerNotRunning("Server is not running")
         if not device.is_connected():
             raise NotConnectedError("Client is not connected")
-        self.__handler.kick.emit(device.get_id())
+        self.__handler.kick.emit(device.id())
 
     @Slot()
     def close(self):
@@ -178,7 +176,7 @@ class QBaseServer(QObject):
             raise ValueError("Model should be subclassing Device class.")
 
         try:
-            model(0, "127.0.0.1", 5000)
+            model(QBaseServer(), 0, "127.0.0.1", 5000)
         except TypeError as e:
             raise TypeError("Model is not valid class! Exception: {}".format(e))
 
@@ -204,7 +202,7 @@ class QBaseServer(QObject):
             device_id (int): Device ID.
         """
         for device in self.__devices:
-            if device.get_id() == device_id:
+            if device.id() == device_id:
                 return device
         raise Exception("CLIENT-{} not found".format(device_id))
 

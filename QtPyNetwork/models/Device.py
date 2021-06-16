@@ -7,10 +7,8 @@ from QtPyNetwork.exceptions import NotConnectedError
 
 class Device(QObject):
     """Represents psychical device connected to server."""
-    _write = Signal(bytes)
-    _kick = Signal()
 
-    def __init__(self, device_id: int, ip: str, port: int):
+    def __init__(self, server, device_id: int, ip: str, port: int):
         super(Device, self).__init__(None)
         try:
             ipaddress.ip_address(ip)
@@ -20,33 +18,41 @@ class Device(QObject):
         if not 1 <= port <= 65535:
             raise ValueError("Port must be in range 1, 65535")
 
-        self.ip = ip
-        self.port = port
-        self.id = device_id
-        self.connected = True
+        self.__ip = ip
+        self.__port = port
+        self.__id = device_id
+        self.__connected = True
+        self.__server = server
 
     @Slot()
-    def get_id(self):
-        return self.id
+    def server(self):
+        return self.__server
+
+    @Slot()
+    def id(self):
+        return self.__id
+
+    @Slot()
+    def ip(self):
+        return self.__ip
+
+    @Slot()
+    def port(self):
+        return self.__port
 
     @Slot(bool)
     def set_connected(self, value: bool):
-        self.connected = value
+        self.__connected = value
 
     @Slot()
-    def is_connected(self):
-        return self.connected
+    def is_connected(self) -> bool:
+        return self.__connected
 
     @Slot()
     def kick(self):
-        if self.connected:
-            self._kick.emit()
-        else:
-            raise NotConnectedError("Client is not connected")
+        self.server().kick(self)
 
     @Slot(bytes)
-    def write(self, message):
-        if self.connected:
-            self._write.emit(message)
-        else:
-            raise NotConnectedError("Client is not connected")
+    def write(self, message: bytes):
+        self.server().write(message)
+
