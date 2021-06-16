@@ -1,6 +1,12 @@
 Changelog
 =========
 
+- 0.5.1:
+    - Make all variables protected in Device class
+    - Add positional argument `server` for Device model
+    - Add getters for Device model: ip, port, etc.
+    - Update write and kick methods for Device class, remove signals
+
 - 0.5.0:
     - Add `kick` method for Device
     - Emit Device instead of device_id on signals: connected, disconnected, message, error

@@ -17,4 +17,4 @@ Features
 - signals for each event - connected, disconnected, error, etc.
 """
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"
