@@ -18,15 +18,15 @@ class Main(QBalancedServer):
 
     @Slot(Device, str, int)
     def on_connected(self, device: Device, ip, port):
-        self.logger.info("New device connected: {}".format(device.get_id()))
+        self.logger.info("New device connected: {}".format(device.id()))
 
     @Slot(Device, bytes)
     def on_message(self, device: Device, message: bytes):
-        self.logger.info("Received from {}: {}".format(device.get_id(), message))
+        self.logger.info("Received from {}: {}".format(device.id(), message))
 
     @Slot(Device)
     def on_disconnected(self, device: Device):
-        self.logger.info("Device {} disconnected".format(device.get_id()))
+        self.logger.info("Device {} disconnected".format(device.id()))
         self.close()
 
 if __name__ == '__main__':

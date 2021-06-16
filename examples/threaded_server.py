@@ -28,13 +28,13 @@ class Main(QObject):
 
     @Slot(Device, bytes)
     def on_message(self, device, message: bytes):
-        self.logger.info("Received {}: {}".format(device.get_id(), message))
+        self.logger.info("Received {}: {}".format(device.id(), message))
         if message.decode() == "Kick me plz":
             device.kick()
 
     @Slot(Device)
     def on_disconnected(self, device):
-        self.logger.info("Disconnected: {}; Connected: {}".format(device.get_id(), device.is_connected()))
+        self.logger.info("Disconnected: {}; Connected: {}".format(device.id(), device.is_connected()))
         self.close()
 
     @Slot()
