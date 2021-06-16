@@ -1,6 +1,10 @@
 Changelog
 =========
 
+- 0.5.2:
+    - Update readme and examples (replace get_id() with id())
+    - Fix missing positional argument `device` in Device.write() method
+
 - 0.5.1:
     - Make all variables protected in Device class
     - Add positional argument `server` for Device model
