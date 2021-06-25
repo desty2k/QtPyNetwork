@@ -1,6 +1,11 @@
 Changelog
 =========
 
+- 0.5.2:
+    - Update description for PyPI
+    - Update PyPI classifiers and keywords
+    - Fix bandit error (No such file or directory) in safety job
+
 - 0.5.1:
     - Make all variables protected in Device class
     - Add positional argument `server` for Device model
