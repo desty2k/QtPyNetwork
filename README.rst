@@ -31,7 +31,7 @@ See examples directory for client and server code samples.
 Server
 ~~~~~~
 
-You can use both composition and inheritance to use server.
+You can use both composition and inheritance to create server.
 
 Composition
 ^^^^^^^^^^^
