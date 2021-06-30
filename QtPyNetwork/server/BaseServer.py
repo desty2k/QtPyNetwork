@@ -48,8 +48,7 @@ class QBaseServer(QObject):
 
     @Slot(str, int, bytes)
     def start(self, ip: str, port: int):
-        """Start server on IP:Port and decrypt incomming and
-        outcomming messages with encryption key."""
+        """Start server."""
         if self.__handlerClass:
             ip = QHostAddress(ip)
             self.__ip = ip
@@ -110,18 +109,46 @@ class QBaseServer(QObject):
 
     @Slot(Device, str, int)
     def on_connected(self, device: Device, ip: str, port: int):
+        """Called when new client connects to server.
+        Emits connected signal.
+
+        Args:
+            device (Device): Device object.
+            ip (str): Client ip address.
+            port (int): Client port.
+        """
         self.connected.emit(device, ip, port)
 
     @Slot(Device, bytes)
     def on_message(self, device: Device, message: bytes):
+        """Called when server receives message from client.
+        Emits message signal.
+
+        Args:
+            device (Device): Message sender.
+            message (bytes): Message.
+        """
         self.message.emit(device, message)
 
     @Slot(Device)
     def on_disconnected(self, device: Device):
+        """Called when device disconnects from server.
+        Emits disconnected signal.
+
+        Args:
+            device (Device): Disconnected device.
+        """
         self.disconnected.emit(device)
 
     @Slot(Device, str)
     def on_error(self, device: Device, error: str):
+        """Called when a socket error occurs.
+        Emits error signal.
+
+        Args:
+            device (Device): Device object.
+            error (str): Error string.
+        """
         self.error.emit(device, error)
 
     @Slot()

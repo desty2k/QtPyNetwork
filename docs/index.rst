@@ -11,6 +11,7 @@ Welcome to QtPyNetwork's documentation!
    :caption: Contents:
 
    readme.rst
+   reference/modules.rst
    license.rst
    changes.rst
 

@@ -190,26 +190,56 @@ class QThreadedClient(QObject):
 
     @Slot(str, int)
     def on_connected(self, ip, port):
+        """Called when client connects to server.
+        Emits connected signal.
+
+        Args:
+            ip (str): Client ip address.
+            port (int): Client port.
+        """
         self.connected.emit(ip, port)
 
     @Slot(str, int)
     def on_failed_to_connect(self, ip, port):
+        """Called when client fails to connect to server.
+        Emits failed_to_connect signal.
+
+        Args:
+            ip (str): Client ip address.
+            port (int): Client port.
+        """
         self.failed_to_connect.emit(ip, port)
 
     @Slot(bytes)
     def on_message(self, message: bytes):
+        """Called when client receives message from server.
+        Emits message signal.
+
+        Args:
+            message (bytes): Message.
+        """
         self.message.emit(message)
 
     @Slot()
     def on_disconnected(self):
+        """Called when device disconnects from server.
+        Emits disconnected signal."""
         self.disconnected.emit()
 
     @Slot(str)
     def on_error(self, error: str):
+        """Called when a socket error occurs.
+        Emits error signal.
+
+        Args:
+            error (str): Error string.
+        """
         self.error.emit(error)
 
     @Slot()
     def on_closed(self):
+        """Called when when the socket is closed.
+        Emits closed signal."""
         self.closed.emit()
 
     @Slot(bytes)

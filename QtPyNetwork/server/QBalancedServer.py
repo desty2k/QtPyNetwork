@@ -10,16 +10,24 @@ from QtPyNetwork.server.BaseServer import QBaseServer
 class SocketWorker(QObject):
     """SocketWorker manages sockets and handles messages.
 
-    Signals:
+    Outgoing signals:
         - disconnected (device_id: int): Client disconnected.
-        - connected (device_id: int, ip: str, port: int): Client connected
+        - connected (device_id: int, ip: str, port: int): Client connected.
         - message (device_id: int, message: bytes): Message from client.
         - error (device_id: int, error: str): Error occured.
         - closed (): Closed successfully.
-        - send (device_id: int, message: bytes): Emit to send message
-        to client with ID in this thread.
-        - send (message: bytes): Emit to send message
-        to all clients in this thread.
+
+    Incomming signals:
+        - write (device_id: int, message: bytes): Emit to send message
+          to client with ID in this worker.
+        - write_all (message: bytes): Emit to send message
+          to all clients in this worker.
+        - kick (device_id: int): Emit to kick device with ID
+          in this worker.
+        - connection (device_id: int, socket_descriptor: int): Emit to create new socket
+          object in this worker.
+        - close_signal (): Emit to close all connections.
+
     """
 
     disconnected = Signal(int)
@@ -54,6 +62,11 @@ class SocketWorker(QObject):
 
     @Slot(int)
     def _kick(self, device_id):
+        """Executed inside worker thread after emitting kick signal.
+
+        Args:
+            device_id (int): ID of device to kick.
+        """
         socket = self.get_socket_by_id(device_id)
         if socket:
             socket.close()
@@ -102,12 +115,12 @@ class SocketWorker(QObject):
 
     @Slot()
     def socket_count(self):
-        """Returns amount of sockets."""
+        """Returns amount of active sockets."""
         return len(self.sockets)
 
     @Slot()
     def used_ids(self):
-        """Returns used IDs."""
+        """Returns IDs used by this worker."""
         return [int(x.objectName()) for x in self.sockets]
 
     @Slot(int)
@@ -234,19 +247,27 @@ class SocketWorker(QObject):
 
 
 class BalancedSocketHandler(QObject):
-    """Creates socket handlers threads. New connections
-    are passed to SocketWorker with least load.
+    """Creates socket handlers threads. New sockets
+    are passed to worker with least load.
 
-    Signals:
+    Outgoing signals:
         - started (): Handler started.
-        - closed (): Handler closed.
-        - message (device_id: int, message: bytes): Message received.
-        - close_signal (): Emit this to close handler from another thread.
-        - connection (device_id: int): New connection.
+        - closed (): Handler closed all connections.
+        - message (client_id: int, message: bytes): Message received.
+        - error (client_id: int, error: str): Socket error.
+        - disconnected (client_id: int). Client disconnected.
+
+    Incomming signals:
+        - write (device_id: int, message: bytes): Emit to send message
+          to client with ID.
+        - write_all (message: bytes): Emit to send message
+          to all clients.
+        - kick (device_id: int): Emit to kick client with ID.
+        - close_signal (): Emit to close all connections.
+
     """
     started = Signal()
     closed = Signal()
-    close_signal = Signal()
 
     connected = Signal(int, str, int)
     message = Signal(int, bytes)
@@ -256,6 +277,7 @@ class BalancedSocketHandler(QObject):
     write = Signal(int, bytes)
     write_all = Signal(bytes)
     kick = Signal(int)
+    close_signal = Signal()
 
     def __init__(self, cores=None):
         super(BalancedSocketHandler, self).__init__(None)
@@ -263,7 +285,7 @@ class BalancedSocketHandler(QObject):
 
     @Slot()
     def start(self):
-        """Start server and create socket handlers."""
+        """Start server and create socket workers."""
         self.__logger = logging.getLogger(self.__class__.__name__)  # noqa
         self.workers = []  # noqa
         self.threads = []  # noqa
@@ -290,6 +312,7 @@ class BalancedSocketHandler(QObject):
 
     @Slot()
     def create_worker(self):
+        """Creates new socket worker in thread."""
         thread = QThread()
         worker = SocketWorker()
         worker.moveToThread(thread)
@@ -390,6 +413,10 @@ class BalancedSocketHandler(QObject):
 
 
 class QBalancedServer(QBaseServer):
+    """TCP server with constant amount of threads. When new client connects, server
+    checks which worker has the least amount of active sockets and passes socket
+    descriptor to that thread."""
+
     def __init__(self, *args, **kwargs):
         super(QBalancedServer, self).__init__(*args, **kwargs)
         self.set_handler_class(BalancedSocketHandler)

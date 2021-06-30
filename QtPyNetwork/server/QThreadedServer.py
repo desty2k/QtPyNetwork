@@ -8,19 +8,31 @@ from QtPyNetwork.server.BaseServer import QBaseServer
 
 
 class SocketClient(QObject):
+    """Keeps socket in separate thread.
+
+    Outgoing signals:
+        - disconnected (device_id: int): Client disconnected.
+        - connected (device_id: int, ip: str, port: int): Client connected.
+        - message (device_id: int, message: bytes): Message from client.
+        - error (device_id: int, error: str): Error occured.
+        - closed (): Closed successfully.
+
+    Incomming signals:
+        - close_signal (): Emit to close connection.
+        - write (device_id: int, message: bytes): Emit to send message
+          to client with ID in this thread.
+
+    """
+
     disconnected = Signal(int)
     connected = Signal(int, str, int)
     message = Signal(int, bytes)
     error = Signal(int, str)
     closed = Signal()
 
-    connection = Signal(int, int)
     close_signal = Signal()
 
     write = Signal(bytes)
-
-    json_encoder = None
-    json_decoder = None
 
     def __init__(self, socket_descriptor, client_id):
         super(SocketClient, self).__init__(None)
@@ -29,7 +41,7 @@ class SocketClient(QObject):
 
     @Slot()
     def run(self) -> None:
-        """Run socket manager"""
+        """Run socket manager."""
         self._logger = logging.getLogger(self.__class__.__name__)  # noqa
         self.data = {"size_left": 0, "data": b""}  # noqa
         self.socket = QTcpSocket()  # noqa
@@ -48,7 +60,8 @@ class SocketClient(QObject):
             self.write.connect(self._write)
 
     @Slot()
-    def get_id(self):
+    def get_id(self) -> int:
+        """Get ID of client."""
         return self.id
 
     @Slot(bytes)
@@ -140,18 +153,26 @@ class SocketClient(QObject):
 
 
 class ThreadedSocketHandler(QObject):
-    """Creates client threads.
+    """Creates and manages socket client threads.
 
-    Signals:
+    Outgoing signals:
         - started (): Handler started.
-        - finished (): Handler finished.
+        - closed (): Handler closed all connections.
         - message (client_id: int, message: bytes): Message received.
-        - close_signal (): Emit this to close handler from another thread.
-        - connection (client_id: int): New connection.
+        - error (client_id: int, error: str): Socket error.
+        - disconnected (client_id: int). Client disconnected.
+
+    Incomming signals:
+        - write (device_id: int, message: bytes): Emit to send message
+          to client with ID.
+        - write_all (message: bytes): Emit to send message
+          to all clients.
+        - kick (device_id: int): Emit to kick client with ID.
+        - close_signal (): Emit to close all connections.
+
     """
     started = Signal()
     closed = Signal()
-    close_signal = Signal()
 
     connected = Signal(int, str, int)
     message = Signal(int, bytes)
@@ -161,6 +182,7 @@ class ThreadedSocketHandler(QObject):
     write = Signal(int, bytes)
     write_all = Signal(bytes)
     kick = Signal(int)
+    close_signal = Signal()
 
     def __init__(self):
         super(ThreadedSocketHandler, self).__init__(None)
@@ -212,11 +234,17 @@ class ThreadedSocketHandler(QObject):
 
     @Slot(int)
     def on_client_disconnected(self, client_id: int):
+        """Remove client object after disconnection.
+
+        Args:
+            client_id (int): Client ID
+        """
         self.clients.remove(self.get_client_by_id(client_id))
         self.disconnected.emit(client_id)
 
     @Slot()
     def on_thread_finished(self):
+        """Remove all finished threads."""
         self.threads = [thread for thread in self.threads if thread.isRunning()]
 
     @Slot(int)
@@ -300,7 +328,7 @@ class ThreadedSocketHandler(QObject):
 
 class QThreadedServer(QBaseServer):
     """Socket server with dynamic amount of threads. When client connects,
-    handler creates new thread and passes socket descriptor to that thread. """
+    handler creates new thread and passes socket descriptor to that thread."""
 
     def __init__(self, *args, **kwargs):
         super(QThreadedServer, self).__init__(*args, **kwargs)
