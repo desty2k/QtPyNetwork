@@ -1,0 +1,631 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>QtPyNetwork.server.QBalancedServer &mdash; QtPyBotnet  documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+        <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+        <script src="../../../_static/jquery.js"></script>
+        <script src="../../../_static/underscore.js"></script>
+        <script src="../../../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../../../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../../index.html" class="icon icon-home"> QtPyBotnet
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.5.3
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../readme.html">QtPyNetwork</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../reference/modules.html">Source</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../license.html">License</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changes.html">Changelog</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">QtPyBotnet</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+        
+      <li>QtPyNetwork.server.QBalancedServer</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for QtPyNetwork.server.QBalancedServer</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">qtpy.QtCore</span> <span class="kn">import</span> <span class="n">Slot</span><span class="p">,</span> <span class="n">Signal</span><span class="p">,</span> <span class="n">QObject</span><span class="p">,</span> <span class="n">QThread</span><span class="p">,</span> <span class="n">Qt</span>
+<span class="kn">from</span> <span class="nn">qtpy.QtNetwork</span> <span class="kn">import</span> <span class="n">QTcpSocket</span>
+
+<span class="kn">import</span> <span class="nn">struct</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+
+<span class="kn">from</span> <span class="nn">QtPyNetwork.server.BaseServer</span> <span class="kn">import</span> <span class="n">QBaseServer</span>
+
+
+<div class="viewcode-block" id="SocketWorker"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.QBalancedServer.SocketWorker">[docs]</a><span class="k">class</span> <span class="nc">SocketWorker</span><span class="p">(</span><span class="n">QObject</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;SocketWorker manages sockets and handles messages.</span>
+
+<span class="sd">    Outgoing signals:</span>
+<span class="sd">        - disconnected (device_id: int): Client disconnected.</span>
+<span class="sd">        - connected (device_id: int, ip: str, port: int): Client connected.</span>
+<span class="sd">        - message (device_id: int, message: bytes): Message from client.</span>
+<span class="sd">        - error (device_id: int, error: str): Error occured.</span>
+<span class="sd">        - closed (): Closed successfully.</span>
+
+<span class="sd">    Incomming signals:</span>
+<span class="sd">        - write (device_id: int, message: bytes): Emit to send message</span>
+<span class="sd">          to client with ID in this worker.</span>
+<span class="sd">        - write_all (message: bytes): Emit to send message</span>
+<span class="sd">          to all clients in this worker.</span>
+<span class="sd">        - kick (device_id: int): Emit to kick device with ID</span>
+<span class="sd">          in this worker.</span>
+<span class="sd">        - connection (device_id: int, socket_descriptor: int): Emit to create new socket</span>
+<span class="sd">          object in this worker.</span>
+<span class="sd">        - close_signal (): Emit to close all connections.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">disconnected</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+    <span class="n">connected</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
+    <span class="n">message</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">)</span>
+    <span class="n">error</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
+    <span class="n">closed</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">()</span>
+
+    <span class="n">connection</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
+    <span class="n">close_signal</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">()</span>
+
+    <span class="n">write</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">)</span>
+    <span class="n">write_all</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">(</span><span class="nb">bytes</span><span class="p">)</span>
+    <span class="n">kick</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">SocketWorker</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">parent</span><span class="p">)</span>
+
+<div class="viewcode-block" id="SocketWorker.start"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.QBalancedServer.SocketWorker.start">[docs]</a>    <span class="nd">@Slot</span><span class="p">()</span>
+    <span class="k">def</span> <span class="nf">start</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Run socket worker.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sockets</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># noqa</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># noqa</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)</span>  <span class="c1"># noqa</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">on_connection</span><span class="p">,</span> <span class="n">Qt</span><span class="o">.</span><span class="n">BlockingQueuedConnection</span><span class="p">)</span>  <span class="c1"># noqa</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">close_signal</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">close</span><span class="p">,</span> <span class="n">Qt</span><span class="o">.</span><span class="n">BlockingQueuedConnection</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">write</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_write</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">write_all</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_write_all</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">kick</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_kick</span><span class="p">)</span></div>
+
+    <span class="nd">@Slot</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_kick</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device_id</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Executed inside worker thread after emitting kick signal.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            device_id (int): ID of device to kick.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">socket</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_socket_by_id</span><span class="p">(</span><span class="n">device_id</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">socket</span><span class="p">:</span>
+            <span class="n">socket</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="k">return</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Could not find socket with ID: </span><span class="si">{}</span><span class="s2">!&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">device_id</span><span class="p">))</span>
+
+    <span class="nd">@Slot</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_write</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">message</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Send task to client. DO NOT USE THIS! Emit write signal instead!</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            device_id (int): Client ID.</span>
+<span class="sd">            message (bytes): Message to send.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">socket</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_socket_by_id</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">device_id</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">socket</span><span class="p">:</span>
+            <span class="n">message</span> <span class="o">=</span> <span class="n">struct</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="s1">&#39;!L&#39;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">message</span><span class="p">))</span> <span class="o">+</span> <span class="n">message</span>
+            <span class="n">socket</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+            <span class="n">socket</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Could not find socket with specified ID.&quot;</span><span class="p">)</span>
+
+    <span class="nd">@Slot</span><span class="p">(</span><span class="nb">bytes</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_write_all</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Send task to all connected clients. DO NOT USE THIS! Emit write_all signal instead!</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            message (bytes): Message to send.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">socket</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">sockets</span><span class="p">:</span>
+            <span class="n">message</span> <span class="o">=</span> <span class="n">struct</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="s1">&#39;!L&#39;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">message</span><span class="p">))</span> <span class="o">+</span> <span class="n">message</span>
+            <span class="n">socket</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+            <span class="n">socket</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+
+<div class="viewcode-block" id="SocketWorker.get_socket_by_id"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.QBalancedServer.SocketWorker.get_socket_by_id">[docs]</a>    <span class="nd">@Slot</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">get_socket_by_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Returns socket object associated to provided ID.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            device_id (int): Socket ID.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">conn</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">sockets</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">int</span><span class="p">(</span><span class="n">conn</span><span class="o">.</span><span class="n">objectName</span><span class="p">())</span> <span class="o">==</span> <span class="nb">int</span><span class="p">(</span><span class="n">device_id</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">conn</span>
+        <span class="k">return</span> <span class="kc">None</span></div>
+
+<div class="viewcode-block" id="SocketWorker.socket_count"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.QBalancedServer.SocketWorker.socket_count">[docs]</a>    <span class="nd">@Slot</span><span class="p">()</span>
+    <span class="k">def</span> <span class="nf">socket_count</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Returns amount of active sockets.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sockets</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="SocketWorker.used_ids"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.QBalancedServer.SocketWorker.used_ids">[docs]</a>    <span class="nd">@Slot</span><span class="p">()</span>
+    <span class="k">def</span> <span class="nf">used_ids</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Returns IDs used by this worker.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">objectName</span><span class="p">())</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">sockets</span><span class="p">]</span></div>
+
+<div class="viewcode-block" id="SocketWorker.has_device_id"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.QBalancedServer.SocketWorker.has_device_id">[docs]</a>    <span class="nd">@Slot</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">has_device_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Check if this thread has socket with ID.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            device_id (int): Socket ID.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">device_id</span><span class="p">)</span> <span class="ow">in</span> <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">socket</span><span class="o">.</span><span class="n">objectName</span><span class="p">())</span> <span class="k">for</span> <span class="n">socket</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">sockets</span><span class="p">]</span></div>
+
+<div class="viewcode-block" id="SocketWorker.on_connection"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.QBalancedServer.SocketWorker.on_connection">[docs]</a>    <span class="nd">@Slot</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">on_connection</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">socket_descriptor</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Create new QTcpSocket object and setup connection with client.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            device_id (int): Socket ID.</span>
+<span class="sd">            socket_descriptor (int) Socket descriptor.</span>
+<span class="sd">        Note:</span>
+<span class="sd">            Emits connected signal.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">socket</span> <span class="o">=</span> <span class="n">QTcpSocket</span><span class="p">()</span>
+        <span class="n">socket</span><span class="o">.</span><span class="n">setParent</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>  <span class="c1"># noqa</span>
+        <span class="k">if</span> <span class="n">socket</span><span class="o">.</span><span class="n">setSocketDescriptor</span><span class="p">(</span><span class="n">socket_descriptor</span><span class="p">):</span>  <span class="c1"># noqa</span>
+            <span class="n">socket</span><span class="o">.</span><span class="n">readyRead</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">on_message</span><span class="p">(</span><span class="n">socket</span><span class="p">))</span>  <span class="c1"># noqa</span>
+            <span class="n">socket</span><span class="o">.</span><span class="n">disconnected</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">on_disconnected</span><span class="p">(</span><span class="n">socket</span><span class="p">))</span>  <span class="c1"># noqa</span>
+            <span class="n">socket</span><span class="o">.</span><span class="n">error</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">on_error</span><span class="p">(</span><span class="n">socket</span><span class="p">))</span>  <span class="c1"># noqa</span>
+            <span class="n">socket</span><span class="o">.</span><span class="n">setObjectName</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">device_id</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">sockets</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">socket</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;New connection from CLIENT-</span><span class="si">{}</span><span class="s2"> &quot;</span>
+                                <span class="s2">&quot;IP: </span><span class="si">{}</span><span class="s2">:</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">socket</span><span class="o">.</span><span class="n">objectName</span><span class="p">(),</span>
+                                                   <span class="n">socket</span><span class="o">.</span><span class="n">peerAddress</span><span class="p">()</span><span class="o">.</span><span class="n">toString</span><span class="p">(),</span>
+                                                   <span class="n">socket</span><span class="o">.</span><span class="n">peerPort</span><span class="p">()))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">connected</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">socket</span><span class="o">.</span><span class="n">objectName</span><span class="p">()),</span> <span class="n">socket</span><span class="o">.</span><span class="n">peerAddress</span><span class="p">()</span><span class="o">.</span><span class="n">toString</span><span class="p">(),</span> <span class="n">socket</span><span class="o">.</span><span class="n">peerPort</span><span class="p">())</span></div>
+
+<div class="viewcode-block" id="SocketWorker.on_message"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.QBalancedServer.SocketWorker.on_message">[docs]</a>    <span class="nd">@Slot</span><span class="p">(</span><span class="n">QTcpSocket</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">on_message</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">conn</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Handle socket messages.</span>
+
+<span class="sd">        Note:</span>
+<span class="sd">            Emits message signal.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">device_id</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">conn</span><span class="o">.</span><span class="n">objectName</span><span class="p">())</span>
+        <span class="k">while</span> <span class="n">conn</span><span class="o">.</span><span class="n">bytesAvailable</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">device_id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">:</span>
+                <span class="n">size_left</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">device_id</span><span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;size_left&quot;</span><span class="p">)</span>
+                <span class="n">message</span> <span class="o">=</span> <span class="n">conn</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">size_left</span><span class="p">)</span>
+                <span class="n">size_left</span> <span class="o">=</span> <span class="n">size_left</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">size_left</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">device_id</span><span class="p">][</span><span class="s2">&quot;size_left&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">size_left</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">device_id</span><span class="p">][</span><span class="s2">&quot;data&quot;</span><span class="p">]</span> <span class="o">+=</span> <span class="n">message</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">message</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">device_id</span><span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;data&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="n">message</span>
+                    <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">device_id</span><span class="p">]</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">message</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">device_id</span><span class="p">,</span> <span class="n">message</span><span class="p">)</span>
+
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">header_size</span> <span class="o">=</span> <span class="n">struct</span><span class="o">.</span><span class="n">calcsize</span><span class="p">(</span><span class="s1">&#39;!L&#39;</span><span class="p">)</span>
+                <span class="n">header</span> <span class="o">=</span> <span class="n">conn</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">header_size</span><span class="p">)</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">header</span><span class="p">)</span> <span class="o">==</span> <span class="mi">4</span><span class="p">:</span>
+                    <span class="n">msg_size</span> <span class="o">=</span> <span class="n">struct</span><span class="o">.</span><span class="n">unpack</span><span class="p">(</span><span class="s1">&#39;!L&#39;</span><span class="p">,</span> <span class="n">header</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="n">message</span> <span class="o">=</span> <span class="n">conn</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">msg_size</span><span class="p">)</span>
+
+                    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">message</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">msg_size</span><span class="p">:</span>
+                        <span class="n">msg_size</span> <span class="o">=</span> <span class="n">msg_size</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">device_id</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;data&quot;</span><span class="p">:</span> <span class="n">message</span><span class="p">,</span> <span class="s2">&quot;size_left&quot;</span><span class="p">:</span> <span class="n">msg_size</span><span class="p">}</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">message</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">device_id</span><span class="p">,</span> <span class="n">message</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="SocketWorker.on_disconnected"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.QBalancedServer.SocketWorker.on_disconnected">[docs]</a>    <span class="nd">@Slot</span><span class="p">(</span><span class="n">QTcpSocket</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">on_disconnected</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">conn</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Handle socket disconnection.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            conn (QTcpSocket): Socket object.</span>
+
+<span class="sd">        Note:</span>
+<span class="sd">            Emits disconnected signal.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">device_id</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">conn</span><span class="o">.</span><span class="n">objectName</span><span class="p">())</span>
+        <span class="k">if</span> <span class="n">conn</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">sockets</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">conn</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">sockets</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">conn</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">RuntimeError</span><span class="p">:</span>
+                <span class="k">pass</span>
+        <span class="k">if</span> <span class="n">device_id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">:</span>
+            <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">device_id</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;CLIENT-</span><span class="si">{}</span><span class="s2"> Disconnected </span><span class="si">{}</span><span class="s2">: </span><span class="si">{}</span><span class="s2">:</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">device_id</span><span class="p">,</span> <span class="n">conn</span><span class="o">.</span><span class="n">peerName</span><span class="p">(),</span>
+                                                                     <span class="n">conn</span><span class="o">.</span><span class="n">peerAddress</span><span class="p">()</span><span class="o">.</span><span class="n">toString</span><span class="p">(),</span>
+                                                                     <span class="n">conn</span><span class="o">.</span><span class="n">peerPort</span><span class="p">()))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">disconnected</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">device_id</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="SocketWorker.on_error"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.QBalancedServer.SocketWorker.on_error">[docs]</a>    <span class="nd">@Slot</span><span class="p">(</span><span class="n">QTcpSocket</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">on_error</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">conn</span><span class="p">:</span> <span class="n">QTcpSocket</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Handle socket errors.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            conn (QTcpSocket): Socket object.</span>
+
+<span class="sd">        Note:</span>
+<span class="sd">            Emits error signal.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">device_id</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">conn</span><span class="o">.</span><span class="n">objectName</span><span class="p">())</span>
+        <span class="n">e</span> <span class="o">=</span> <span class="n">conn</span><span class="o">.</span><span class="n">errorString</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;CLIENT-</span><span class="si">{}</span><span class="s2"> Error: </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">device_id</span><span class="p">,</span> <span class="n">e</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">error</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">device_id</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="SocketWorker.close"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.QBalancedServer.SocketWorker.close">[docs]</a>    <span class="nd">@Slot</span><span class="p">()</span>
+    <span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Close all connections.</span>
+
+<span class="sd">        Note:</span>
+<span class="sd">            Emits closed signal.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">conn</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">sockets</span><span class="p">:</span>
+            <span class="n">conn</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">conn</span><span class="o">.</span><span class="n">deleteLater</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">sockets</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">conn</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                <span class="k">pass</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">closed</span><span class="o">.</span><span class="n">emit</span><span class="p">()</span></div></div>
+
+
+<div class="viewcode-block" id="BalancedSocketHandler"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.QBalancedServer.BalancedSocketHandler">[docs]</a><span class="k">class</span> <span class="nc">BalancedSocketHandler</span><span class="p">(</span><span class="n">QObject</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Creates socket handlers threads. New sockets</span>
+<span class="sd">    are passed to worker with least load.</span>
+
+<span class="sd">    Outgoing signals:</span>
+<span class="sd">        - started (): Handler started.</span>
+<span class="sd">        - closed (): Handler closed all connections.</span>
+<span class="sd">        - message (client_id: int, message: bytes): Message received.</span>
+<span class="sd">        - error (client_id: int, error: str): Socket error.</span>
+<span class="sd">        - disconnected (client_id: int). Client disconnected.</span>
+
+<span class="sd">    Incomming signals:</span>
+<span class="sd">        - write (device_id: int, message: bytes): Emit to send message</span>
+<span class="sd">          to client with ID.</span>
+<span class="sd">        - write_all (message: bytes): Emit to send message</span>
+<span class="sd">          to all clients.</span>
+<span class="sd">        - kick (device_id: int): Emit to kick client with ID.</span>
+<span class="sd">        - close_signal (): Emit to close all connections.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">started</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">()</span>
+    <span class="n">closed</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">()</span>
+
+    <span class="n">connected</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
+    <span class="n">message</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">)</span>
+    <span class="n">error</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
+    <span class="n">disconnected</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+
+    <span class="n">write</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">)</span>
+    <span class="n">write_all</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">(</span><span class="nb">bytes</span><span class="p">)</span>
+    <span class="n">kick</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+    <span class="n">close_signal</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cores</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">BalancedSocketHandler</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cores</span> <span class="o">=</span> <span class="n">cores</span>
+
+<div class="viewcode-block" id="BalancedSocketHandler.start"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.QBalancedServer.BalancedSocketHandler.start">[docs]</a>    <span class="nd">@Slot</span><span class="p">()</span>
+    <span class="k">def</span> <span class="nf">start</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Start server and create socket workers.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)</span>  <span class="c1"># noqa</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">workers</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># noqa</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">threads</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># noqa</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">cores</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cores</span> <span class="o">=</span> <span class="n">QThread</span><span class="o">.</span><span class="n">idealThreadCount</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">close_signal</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">close</span><span class="p">,</span> <span class="n">Qt</span><span class="o">.</span><span class="n">BlockingQueuedConnection</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">write</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_write</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">write_all</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_write_all</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">kick</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_kick</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Allocating </span><span class="si">{}</span><span class="s2"> worker threads...&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cores</span><span class="p">))</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cores</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">create_worker</span><span class="p">()</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Started worker threads!&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Active socket workers: </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">sum</span><span class="p">([</span><span class="mi">1</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">threads</span> <span class="k">if</span> <span class="n">x</span><span class="o">.</span><span class="n">isRunning</span><span class="p">()])))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">started</span><span class="o">.</span><span class="n">emit</span><span class="p">()</span>
+
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Failed to start socket handler: </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">e</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">close</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="BalancedSocketHandler.create_worker"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.QBalancedServer.BalancedSocketHandler.create_worker">[docs]</a>    <span class="nd">@Slot</span><span class="p">()</span>
+    <span class="k">def</span> <span class="nf">create_worker</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Creates new socket worker in thread.&quot;&quot;&quot;</span>
+        <span class="n">thread</span> <span class="o">=</span> <span class="n">QThread</span><span class="p">()</span>
+        <span class="n">worker</span> <span class="o">=</span> <span class="n">SocketWorker</span><span class="p">()</span>
+        <span class="n">worker</span><span class="o">.</span><span class="n">moveToThread</span><span class="p">(</span><span class="n">thread</span><span class="p">)</span>
+
+        <span class="n">worker</span><span class="o">.</span><span class="n">connected</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">connected</span><span class="o">.</span><span class="n">emit</span><span class="p">)</span>  <span class="c1"># noqa</span>
+        <span class="n">worker</span><span class="o">.</span><span class="n">message</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">message</span><span class="o">.</span><span class="n">emit</span><span class="p">)</span>  <span class="c1"># noqa</span>
+        <span class="n">worker</span><span class="o">.</span><span class="n">disconnected</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">disconnected</span><span class="o">.</span><span class="n">emit</span><span class="p">)</span>  <span class="c1"># noqa</span>
+        <span class="n">worker</span><span class="o">.</span><span class="n">error</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">error</span><span class="o">.</span><span class="n">emit</span><span class="p">)</span>  <span class="c1"># noqa</span>
+
+        <span class="n">thread</span><span class="o">.</span><span class="n">started</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">worker</span><span class="o">.</span><span class="n">start</span><span class="p">)</span>  <span class="c1"># noqa</span>
+        <span class="n">worker</span><span class="o">.</span><span class="n">closed</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">thread</span><span class="o">.</span><span class="n">quit</span><span class="p">)</span>  <span class="c1"># noqa</span>
+        <span class="n">worker</span><span class="o">.</span><span class="n">closed</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">thread</span><span class="o">.</span><span class="n">wait</span><span class="p">)</span>  <span class="c1"># noqa</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">workers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">worker</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">threads</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">thread</span><span class="p">)</span>
+        <span class="n">thread</span><span class="o">.</span><span class="n">start</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="BalancedSocketHandler.on_incoming_connection"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.QBalancedServer.BalancedSocketHandler.on_incoming_connection">[docs]</a>    <span class="nd">@Slot</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">on_incoming_connection</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">socket_descriptor</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Select thread with least sockets and setup connection.</span>
+<span class="sd">        Assign not used ID.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            socket_descriptor (int): Socket descriptor.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">count_list</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span><span class="o">.</span><span class="n">socket_count</span><span class="p">()</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">workers</span><span class="p">]</span>
+        <span class="n">worker_id</span> <span class="o">=</span> <span class="n">count_list</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="n">count_list</span><span class="p">))</span>
+        <span class="n">device_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_free_id</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">workers</span><span class="p">[</span><span class="n">worker_id</span><span class="p">]</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">device_id</span><span class="p">,</span> <span class="n">socket_descriptor</span><span class="p">)</span></div>
+
+    <span class="nd">@Slot</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_write</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">message</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Write to client with ID.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            device_id (int): Client ID.</span>
+<span class="sd">            message (bytes): Message.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">worker</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">workers</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">worker</span><span class="o">.</span><span class="n">has_device_id</span><span class="p">(</span><span class="n">device_id</span><span class="p">):</span>
+                <span class="n">worker</span><span class="o">.</span><span class="n">write</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">device_id</span><span class="p">,</span> <span class="n">message</span><span class="p">)</span>
+                <span class="k">return</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Could not find client with ID: </span><span class="si">{}</span><span class="s2">!&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">device_id</span><span class="p">))</span>
+
+    <span class="nd">@Slot</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_kick</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Kick client with ID.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            device_id (int): Client ID.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">worker</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">workers</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">worker</span><span class="o">.</span><span class="n">has_device_id</span><span class="p">(</span><span class="n">device_id</span><span class="p">):</span>
+                <span class="n">worker</span><span class="o">.</span><span class="n">kick</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">device_id</span><span class="p">)</span>
+                <span class="k">return</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Could not find client with ID: </span><span class="si">{}</span><span class="s2">!&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">device_id</span><span class="p">))</span>
+
+    <span class="nd">@Slot</span><span class="p">(</span><span class="nb">bytes</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_write_all</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Write to all clients</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            message (bytes): Message.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">worker</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">workers</span><span class="p">:</span>
+            <span class="n">worker</span><span class="o">.</span><span class="n">write_all</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+
+<div class="viewcode-block" id="BalancedSocketHandler.get_free_id"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.QBalancedServer.BalancedSocketHandler.get_free_id">[docs]</a>    <span class="nd">@Slot</span><span class="p">()</span>
+    <span class="k">def</span> <span class="nf">get_free_id</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Returns not used device ID.&quot;&quot;&quot;</span>
+        <span class="n">used</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">workers</span><span class="p">:</span>
+            <span class="n">used</span> <span class="o">=</span> <span class="n">used</span> <span class="o">+</span> <span class="n">i</span><span class="o">.</span><span class="n">used_ids</span><span class="p">()</span>
+        <span class="n">used</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">used</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">used</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">maxid</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">used</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">maxid</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">i</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">used</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">i</span>
+            <span class="k">return</span> <span class="n">maxid</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="mi">1</span></div>
+
+<div class="viewcode-block" id="BalancedSocketHandler.close"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.QBalancedServer.BalancedSocketHandler.close">[docs]</a>    <span class="nd">@Slot</span><span class="p">()</span>
+    <span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Close server and all socket handlers.</span>
+
+<span class="sd">        Note:</span>
+<span class="sd">            Emits closed signal when successfully closed.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">worker</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">workers</span><span class="p">:</span>
+            <span class="n">worker</span><span class="o">.</span><span class="n">close_signal</span><span class="o">.</span><span class="n">emit</span><span class="p">()</span>
+            <span class="n">worker</span><span class="o">.</span><span class="n">deleteLater</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">thread</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">threads</span><span class="p">:</span>
+            <span class="n">thread</span><span class="o">.</span><span class="n">quit</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Socket handler closed successfully&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">closed</span><span class="o">.</span><span class="n">emit</span><span class="p">()</span></div></div>
+
+
+<div class="viewcode-block" id="QBalancedServer"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.QBalancedServer.QBalancedServer">[docs]</a><span class="k">class</span> <span class="nc">QBalancedServer</span><span class="p">(</span><span class="n">QBaseServer</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;TCP server with constant amount of threads. When new client connects, server</span>
+<span class="sd">    checks which worker has the least amount of active sockets and passes socket</span>
+<span class="sd">    descriptor to that thread.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">QBalancedServer</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_handler_class</span><span class="p">(</span><span class="n">BalancedSocketHandler</span><span class="p">)</span></div>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2021, Wojciech Wentland.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

@@ -1,0 +1,458 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>QtPyNetwork.server.BaseServer &mdash; QtPyBotnet  documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+        <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+        <script src="../../../_static/jquery.js"></script>
+        <script src="../../../_static/underscore.js"></script>
+        <script src="../../../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../../../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../../index.html" class="icon icon-home"> QtPyBotnet
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.5.3
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../readme.html">QtPyNetwork</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../reference/modules.html">Source</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../license.html">License</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changes.html">Changelog</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">QtPyBotnet</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+        
+      <li>QtPyNetwork.server.BaseServer</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for QtPyNetwork.server.BaseServer</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">qtpy.QtCore</span> <span class="kn">import</span> <span class="n">Slot</span><span class="p">,</span> <span class="n">Signal</span><span class="p">,</span> <span class="n">QObject</span><span class="p">,</span> <span class="n">QThread</span>
+<span class="kn">from</span> <span class="nn">qtpy.QtNetwork</span> <span class="kn">import</span> <span class="n">QTcpServer</span><span class="p">,</span> <span class="n">QHostAddress</span>
+
+<span class="kn">from</span> <span class="nn">QtPyNetwork.models</span> <span class="kn">import</span> <span class="n">Device</span>
+<span class="kn">from</span> <span class="nn">QtPyNetwork.exceptions</span> <span class="kn">import</span> <span class="n">NotConnectedError</span><span class="p">,</span> <span class="n">ServerNotRunning</span>
+
+<span class="kn">import</span> <span class="nn">logging</span>
+
+
+<div class="viewcode-block" id="TCPServer"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.BaseServer.TCPServer">[docs]</a><span class="k">class</span> <span class="nc">TCPServer</span><span class="p">(</span><span class="n">QTcpServer</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Listens for incoming connections.&quot;&quot;&quot;</span>
+    <span class="n">connection</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">TCPServer</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">parent</span><span class="p">)</span>
+
+<div class="viewcode-block" id="TCPServer.incomingConnection"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.BaseServer.TCPServer.incomingConnection">[docs]</a>    <span class="nd">@Slot</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">incomingConnection</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">socket_descriptor</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">socket_descriptor</span><span class="p">)</span></div></div>
+
+
+<div class="viewcode-block" id="QBaseServer"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.BaseServer.QBaseServer">[docs]</a><span class="k">class</span> <span class="nc">QBaseServer</span><span class="p">(</span><span class="n">QObject</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Server base for QtPyNetwork.&quot;&quot;&quot;</span>
+    <span class="n">connected</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">(</span><span class="n">Device</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
+    <span class="n">disconnected</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">(</span><span class="n">Device</span><span class="p">)</span>
+    <span class="n">message</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">(</span><span class="n">Device</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">)</span>
+    <span class="n">error</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">(</span><span class="n">Device</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
+
+    <span class="n">server_error</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span>
+    <span class="n">closed</span> <span class="o">=</span> <span class="n">Signal</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">loggerName</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">QBaseServer</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">loggerName</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="n">loggerName</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__ip</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__port</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">__devices</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__deviceModel</span> <span class="o">=</span> <span class="n">Device</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">__handler</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__handler_thread</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__handlerClass</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__server</span> <span class="o">=</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="QBaseServer.start"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.BaseServer.QBaseServer.start">[docs]</a>    <span class="nd">@Slot</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">start</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ip</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">port</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Start server.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">__handlerClass</span><span class="p">:</span>
+            <span class="n">ip</span> <span class="o">=</span> <span class="n">QHostAddress</span><span class="p">(</span><span class="n">ip</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__ip</span> <span class="o">=</span> <span class="n">ip</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__port</span> <span class="o">=</span> <span class="n">port</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__handler</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">__handlerClass</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__handler_thread</span> <span class="o">=</span> <span class="n">QThread</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__handler</span><span class="o">.</span><span class="n">moveToThread</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__handler_thread</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">__handler</span><span class="o">.</span><span class="n">connected</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__on_handler_successful_connection</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__handler</span><span class="o">.</span><span class="n">message</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__on_handler_device_message</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__handler</span><span class="o">.</span><span class="n">error</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__on_handler_device_error</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__handler</span><span class="o">.</span><span class="n">disconnected</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__on_handler_device_disconnected</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__handler</span><span class="o">.</span><span class="n">closed</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">on_closed</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">__handler_thread</span><span class="o">.</span><span class="n">started</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__handler</span><span class="o">.</span><span class="n">start</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__handler</span><span class="o">.</span><span class="n">started</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__setup_server</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__handler_thread</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Handler class not set!&quot;</span><span class="p">)</span></div>
+
+    <span class="nd">@Slot</span><span class="p">()</span>
+    <span class="k">def</span> <span class="nf">__setup_server</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Create QTCPServer, start listening for connections.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__server</span> <span class="o">=</span> <span class="n">TCPServer</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__server</span><span class="o">.</span><span class="n">connection</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__handler</span><span class="o">.</span><span class="n">on_incoming_connection</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">__server</span><span class="o">.</span><span class="n">listen</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__ip</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">__port</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Started listening for connections&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">e</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">__server</span><span class="o">.</span><span class="n">errorString</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">server_error</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+
+    <span class="nd">@Slot</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">__on_handler_successful_connection</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device_id</span><span class="p">,</span> <span class="n">ip</span><span class="p">,</span> <span class="n">port</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;When client connects to server successfully.&quot;&quot;&quot;</span>
+        <span class="n">device</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">__deviceModel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device_id</span><span class="p">,</span> <span class="n">ip</span><span class="p">,</span> <span class="n">port</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__devices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Added new CLIENT-</span><span class="si">{}</span><span class="s2"> with address </span><span class="si">{}</span><span class="s2">:</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">device_id</span><span class="p">,</span> <span class="n">ip</span><span class="p">,</span> <span class="n">port</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">on_connected</span><span class="p">(</span><span class="n">device</span><span class="p">,</span> <span class="n">ip</span><span class="p">,</span> <span class="n">port</span><span class="p">)</span>
+
+    <span class="nd">@Slot</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">__on_handler_device_message</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">message</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;When server receives message from bot.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">on_message</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_device_by_id</span><span class="p">(</span><span class="n">device_id</span><span class="p">),</span> <span class="n">message</span><span class="p">)</span>
+
+    <span class="nd">@Slot</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">__on_handler_device_disconnected</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device_id</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;When bot disconnects from server.&quot;&quot;&quot;</span>
+        <span class="n">device</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_device_by_id</span><span class="p">(</span><span class="n">device_id</span><span class="p">)</span>
+        <span class="n">device</span><span class="o">.</span><span class="n">set_connected</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">device</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">__devices</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__devices</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">on_disconnected</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+
+    <span class="nd">@Slot</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">__on_handler_device_error</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device_id</span><span class="p">,</span> <span class="n">error</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">on_error</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_device_by_id</span><span class="p">(</span><span class="n">device_id</span><span class="p">),</span> <span class="n">error</span><span class="p">)</span>
+
+<div class="viewcode-block" id="QBaseServer.on_connected"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.BaseServer.QBaseServer.on_connected">[docs]</a>    <span class="nd">@Slot</span><span class="p">(</span><span class="n">Device</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">on_connected</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device</span><span class="p">:</span> <span class="n">Device</span><span class="p">,</span> <span class="n">ip</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">port</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Called when new client connects to server.</span>
+<span class="sd">        Emits connected signal.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            device (Device): Device object.</span>
+<span class="sd">            ip (str): Client ip address.</span>
+<span class="sd">            port (int): Client port.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">connected</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">device</span><span class="p">,</span> <span class="n">ip</span><span class="p">,</span> <span class="n">port</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="QBaseServer.on_message"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.BaseServer.QBaseServer.on_message">[docs]</a>    <span class="nd">@Slot</span><span class="p">(</span><span class="n">Device</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">on_message</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device</span><span class="p">:</span> <span class="n">Device</span><span class="p">,</span> <span class="n">message</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Called when server receives message from client.</span>
+<span class="sd">        Emits message signal.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            device (Device): Message sender.</span>
+<span class="sd">            message (bytes): Message.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">message</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">device</span><span class="p">,</span> <span class="n">message</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="QBaseServer.on_disconnected"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.BaseServer.QBaseServer.on_disconnected">[docs]</a>    <span class="nd">@Slot</span><span class="p">(</span><span class="n">Device</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">on_disconnected</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device</span><span class="p">:</span> <span class="n">Device</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Called when device disconnects from server.</span>
+<span class="sd">        Emits disconnected signal.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            device (Device): Disconnected device.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">disconnected</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">device</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="QBaseServer.on_error"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.BaseServer.QBaseServer.on_error">[docs]</a>    <span class="nd">@Slot</span><span class="p">(</span><span class="n">Device</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">on_error</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device</span><span class="p">:</span> <span class="n">Device</span><span class="p">,</span> <span class="n">error</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Called when a socket error occurs.</span>
+<span class="sd">        Emits error signal.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            device (Device): Device object.</span>
+<span class="sd">            error (str): Error string.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">error</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">device</span><span class="p">,</span> <span class="n">error</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="QBaseServer.on_closed"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.BaseServer.QBaseServer.on_closed">[docs]</a>    <span class="nd">@Slot</span><span class="p">()</span>
+    <span class="k">def</span> <span class="nf">on_closed</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">closed</span><span class="o">.</span><span class="n">emit</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="QBaseServer.write"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.BaseServer.QBaseServer.write">[docs]</a>    <span class="nd">@Slot</span><span class="p">(</span><span class="n">Device</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">write</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device</span><span class="p">:</span> <span class="n">Device</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Write data to device.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">__server</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">__handler</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">ServerNotRunning</span><span class="p">(</span><span class="s2">&quot;Server is not running&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">device</span><span class="o">.</span><span class="n">is_connected</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="n">NotConnectedError</span><span class="p">(</span><span class="s2">&quot;Client is not connected&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__handler</span><span class="o">.</span><span class="n">write</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">device</span><span class="o">.</span><span class="n">id</span><span class="p">(),</span> <span class="n">data</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="QBaseServer.write_all"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.BaseServer.QBaseServer.write_all">[docs]</a>    <span class="nd">@Slot</span><span class="p">(</span><span class="nb">bytes</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">write_all</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Write data to all devices.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">__server</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">__handler</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">ServerNotRunning</span><span class="p">(</span><span class="s2">&quot;Server is not running&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__handler</span><span class="o">.</span><span class="n">write_all</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">data</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="QBaseServer.kick"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.BaseServer.QBaseServer.kick">[docs]</a>    <span class="nd">@Slot</span><span class="p">()</span>
+    <span class="k">def</span> <span class="nf">kick</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device</span><span class="p">:</span> <span class="n">Device</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Disconnect device from server.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">__server</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">__handler</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">ServerNotRunning</span><span class="p">(</span><span class="s2">&quot;Server is not running&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">device</span><span class="o">.</span><span class="n">is_connected</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="n">NotConnectedError</span><span class="p">(</span><span class="s2">&quot;Client is not connected&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__handler</span><span class="o">.</span><span class="n">kick</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">device</span><span class="o">.</span><span class="n">id</span><span class="p">())</span></div>
+
+<div class="viewcode-block" id="QBaseServer.close"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.BaseServer.QBaseServer.close">[docs]</a>    <span class="nd">@Slot</span><span class="p">()</span>
+    <span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Disconnect clients and close server.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Closing server...&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">__server</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__server</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">__handler</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__handler</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">__handler_thread</span><span class="o">.</span><span class="n">quit</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="QBaseServer.set_device_model"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.BaseServer.QBaseServer.set_device_model">[docs]</a>    <span class="k">def</span> <span class="nf">set_device_model</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Set model to use for device when client connects.</span>
+
+<span class="sd">        Note:</span>
+<span class="sd">            Model should be subclassing Device.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_running</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Set device model before starting server!&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">issubclass</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">Device</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Model should be subclassing Device class.&quot;</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">model</span><span class="p">(</span><span class="n">QBaseServer</span><span class="p">(),</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;127.0.0.1&quot;</span><span class="p">,</span> <span class="mi">5000</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">TypeError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Model is not valid class! Exception: </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">e</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">__deviceModel</span> <span class="o">=</span> <span class="n">model</span></div>
+
+<div class="viewcode-block" id="QBaseServer.is_running"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.BaseServer.QBaseServer.is_running">[docs]</a>    <span class="k">def</span> <span class="nf">is_running</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Check if server is running.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">__handler_thread</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">__handler_thread</span><span class="o">.</span><span class="n">isRunning</span><span class="p">()</span>
+        <span class="k">return</span> <span class="kc">False</span></div>
+
+<div class="viewcode-block" id="QBaseServer.wait"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.BaseServer.QBaseServer.wait">[docs]</a>    <span class="k">def</span> <span class="nf">wait</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Wait for server thread to close.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">__handler_thread</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">__handler_thread</span><span class="o">.</span><span class="n">wait</span><span class="p">()</span>
+        <span class="k">return</span> <span class="kc">True</span></div>
+
+<div class="viewcode-block" id="QBaseServer.get_device_by_id"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.BaseServer.QBaseServer.get_device_by_id">[docs]</a>    <span class="nd">@Slot</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">get_device_by_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Device</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Returns device with associated ID.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            device_id (int): Device ID.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">device</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">__devices</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">device</span><span class="o">.</span><span class="n">id</span><span class="p">()</span> <span class="o">==</span> <span class="n">device_id</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">device</span>
+        <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;CLIENT-</span><span class="si">{}</span><span class="s2"> not found&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">device_id</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="QBaseServer.get_devices"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.BaseServer.QBaseServer.get_devices">[docs]</a>    <span class="k">def</span> <span class="nf">get_devices</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Returns list with devices.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">__devices</span></div>
+
+<div class="viewcode-block" id="QBaseServer.set_handler_class"><a class="viewcode-back" href="../../../reference/QtPyNetwork.server.html#QtPyNetwork.server.BaseServer.QBaseServer.set_handler_class">[docs]</a>    <span class="k">def</span> <span class="nf">set_handler_class</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">handler</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Set handler to use. This should not be used</span>
+<span class="sd">        outside this library.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_running</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Set socket handler before starting server!&quot;</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">handler</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">TypeError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Handler is not valid class! Exception: </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">e</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__handlerClass</span> <span class="o">=</span> <span class="n">handler</span></div></div>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2021, Wojciech Wentland.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
