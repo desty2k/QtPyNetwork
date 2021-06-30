@@ -1,6 +1,10 @@
 Changelog
 =========
 
+- 0.5.3:
+    - Update docs
+    - Add docs workflow
+
 - 0.5.2:
     - Update description for PyPI
     - Update PyPI classifiers and keywords
