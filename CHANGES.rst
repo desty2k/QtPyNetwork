@@ -1,6 +1,14 @@
 Changelog
 =========
 
+- 0.6.0:
+    - Use private classes where possible
+    - Add `\_\_all__` variable to modules
+    - Add issues and docs links to PyPI
+    - Change development status to stable
+    - Update readme
+    - Fix mistakes in docs
+
 - 0.5.3:
     - Update docs
     - Add docs workflow
