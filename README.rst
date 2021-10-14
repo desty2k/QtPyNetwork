@@ -7,9 +7,15 @@ QtPyNetwork is a small abstraction layer for sending and receiving messages usin
 
 `Check out the complete documentation. <https://desty2k.github.io/QtPyNetwork/readme.html>`__
 
+Features
+--------
+
+- every data write and read call is executed inside thread
+- signals for each event - connected, disconnected, error, etc.
+
 There are two servers available:
 
-- QBalancedServer:
+- QBalancedServer
 - QThreadedServer
 
 The first one has constant amount of threads.
@@ -18,35 +24,25 @@ descriptor to that thread. QThreadedServer creates new thread for each connected
 
 QThreadedClient is socket client, that keeps socket in separate thread.
 
-Features
---------
-
-- every message write and read call is executed inside thread
-- signals for each event - connected, disconnected, error, etc.
-
-
 Usage
 -----
 
 See examples directory for client and server code samples.
+You can use both composition and inheritance to create client and server.
 
-Server
+Client
 ~~~~~~
 
-You can use both composition and inheritance to create server.
-
-Composition
-^^^^^^^^^^^
 
 .. code-block:: python
 
+    from qtpy.QtWidgets import QApplication
     from qtpy.QtCore import QObject, Slot, QCoreApplication
 
     import sys
     import logging
 
-    from QtPyNetwork.server import QBalancedServer
-    from QtPyNetwork.models import Device
+    from QtPyNetwork.client import QThreadedClient
 
     IP, PORT = "127.0.0.1", 12500
 
@@ -55,39 +51,39 @@ Composition
 
         def __init__(self):
             super(Main, self).__init__(None)
+
+        def setup(self):
             self.logger = logging.getLogger(self.__class__.__name__)
 
+            self.cln = QThreadedClient()
+            self.cln.message.connect(self.on_message)
+            self.cln.failed_to_connect.connect(self.close)
+            self.cln.disconnected.connect(self.close)
+            self.cln.start(IP, PORT)
+
+        @Slot(bytes)
+        def on_message(self, data: bytes):
+            self.logger.info(data)
+
         @Slot()
-        def start():
-            self.srv = QBalancedServer()
-            self.srv.connected.connect(self.on_connected)
-            self.srv.disconnected.connect(self.on_disconnected)
-            self.srv.message.connect(self.on_message)
-            self.srv.start(IP, PORT)
+        def close(self):
+            self.cln.close()
+            while self.cln.is_running():
+                self.cln.wait()
+            QApplication.instance().quit()
 
-        @Slot(Device)
-        def on_connected(device: Device):
-            self.logger.info("New device connected: {}".format(device.id()))
-
-        @Slot(Device, bytes)
-        def on_message(self, device: Device, message: bytes):
-            self.logger.info("Received from {}: {}".format(device.id(), message))
-
-        @Slot(Device)
-        def on_disconnected(self, device: Device):
-            self.logger.info("Device {} disconnected".format(device.id()))
-            self.close()
 
     if __name__ == '__main__':
         logging.basicConfig(level=logging.NOTSET)
         app = QCoreApplication(sys.argv)
+
         main = Main()
-        main.start()
+        main.setup()
         sys.exit(app.exec_())
 
 
-Inheritance
-^^^^^^^^^^^
+Server
+~~~~~~
 
 .. code-block:: python
 
