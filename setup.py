@@ -17,7 +17,7 @@ setup(
     python_requires='>=3.6',
     zip_safe=False,
     classifiers=[
-        'Development Status :: 4 - Beta',
+        'Development Status :: 5 - Production/Stable',
 
         'License :: OSI Approved :: MIT License',
 
@@ -40,4 +40,8 @@ setup(
               'pyside2',
               'qtpy',
               'tcp'],
+    project_urls={
+            "Issues": "https://github.com/desty2k/QtPyNetwork/issues",
+            "Docs": "https://desty2k.github.io/QtPyNetwork/",
+        }
 )

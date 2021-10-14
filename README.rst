@@ -1,9 +1,11 @@
 QtPyNetwork
 ===========
 
-|Build Status|  |PyPI Downloads|
+|Build Status| |Docs Status|  |PyPI Downloads|
 
 QtPyNetwork is a small abstraction layer for sending and receiving messages using TCP sockets.
+
+`Check out the complete documentation. <https://desty2k.github.io/QtPyNetwork/readme.html>`__
 
 There are two servers available:
 
@@ -126,7 +128,8 @@ Inheritance
         main.start(IP, PORT)
         sys.exit(app.exec_())
 
-
+.. |Docs Status| image:: https://github.com/desty2k/QtPyNetwork/workflows/docs/badge.svg
+   :target: https://desty2k.github.io/QtPyNetwork/
 .. |Build Status| image:: https://github.com/desty2k/QtPyNetwork/actions/workflows/build.yml/badge.svg
    :target: https://github.com/desty2k/QtPyNetwork/actions/workflows/build.yml
 .. |PyPI Downloads| image:: https://img.shields.io/pypi/dm/qtpynetwork
