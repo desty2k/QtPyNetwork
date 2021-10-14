@@ -6,7 +6,7 @@ from qtpy.QtNetwork import QTcpSocket, QHostAddress, QAbstractSocket
 from qtpy.QtCore import QObject, QIODevice, Signal, QMetaObject, Slot, QThread, Qt
 
 
-class SocketClient(QObject):
+class _SocketClient(QObject):
     closed = Signal()
     connected = Signal(str, int)
     message = Signal(bytes)
@@ -21,7 +21,7 @@ class SocketClient(QObject):
     disconnect_signal = Signal()
 
     def __init__(self, ip: str, port: int, loggerName=None):
-        super(SocketClient, self).__init__(None)
+        super(_SocketClient, self).__init__(None)
         self.ip = ip
         self.port = port
         self.logger_name = loggerName
@@ -171,7 +171,7 @@ class QThreadedClient(QObject):
         self.__ip = ip
         self.__port = port
 
-        self.__client = SocketClient(self.__ip, self.__port, loggerName=self.__logger_name)
+        self.__client = _SocketClient(self.__ip, self.__port, loggerName=self.__logger_name)
         self.__client_thread = QThread()
 
         self.__client_thread.started.connect(self.__client.start)

@@ -7,8 +7,8 @@ import logging
 from QtPyNetwork.server.BaseServer import QBaseServer
 
 
-class SocketWorker(QObject):
-    """SocketWorker manages sockets and handles messages.
+class _SocketWorker(QObject):
+    """_SocketWorker manages sockets and handles messages.
 
     Outgoing signals:
         - disconnected (device_id: int): Client disconnected.
@@ -44,7 +44,7 @@ class SocketWorker(QObject):
     kick = Signal(int)
 
     def __init__(self, parent=None):
-        super(SocketWorker, self).__init__(parent)
+        super(_SocketWorker, self).__init__(parent)
 
     @Slot()
     def start(self) -> None:
@@ -246,7 +246,7 @@ class SocketWorker(QObject):
         self.closed.emit()
 
 
-class BalancedSocketHandler(QObject):
+class _BalancedSocketHandler(QObject):
     """Creates socket handlers threads. New sockets
     are passed to worker with least load.
 
@@ -280,7 +280,7 @@ class BalancedSocketHandler(QObject):
     close_signal = Signal()
 
     def __init__(self, cores=None):
-        super(BalancedSocketHandler, self).__init__(None)
+        super(_BalancedSocketHandler, self).__init__(None)
         self.cores = cores
 
     @Slot()
@@ -314,7 +314,7 @@ class BalancedSocketHandler(QObject):
     def create_worker(self):
         """Creates new socket worker in thread."""
         thread = QThread()
-        worker = SocketWorker()
+        worker = _SocketWorker()
         worker.moveToThread(thread)
 
         worker.connected.connect(self.connected.emit)  # noqa
@@ -419,4 +419,4 @@ class QBalancedServer(QBaseServer):
 
     def __init__(self, *args, **kwargs):
         super(QBalancedServer, self).__init__(*args, **kwargs)
-        self.set_handler_class(BalancedSocketHandler)
+        self.set_handler_class(_BalancedSocketHandler)

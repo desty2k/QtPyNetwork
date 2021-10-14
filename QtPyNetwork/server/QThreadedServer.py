@@ -7,7 +7,7 @@ import logging
 from QtPyNetwork.server.BaseServer import QBaseServer
 
 
-class SocketClient(QObject):
+class _SocketClient(QObject):
     """Keeps socket in separate thread.
 
     Outgoing signals:
@@ -35,7 +35,7 @@ class SocketClient(QObject):
     write = Signal(bytes)
 
     def __init__(self, socket_descriptor, client_id):
-        super(SocketClient, self).__init__(None)
+        super(_SocketClient, self).__init__(None)
         self.socket_descriptor = socket_descriptor
         self.id = int(client_id)
 
@@ -152,7 +152,7 @@ class SocketClient(QObject):
         self.closed.emit()
 
 
-class ThreadedSocketHandler(QObject):
+class _ThreadedSocketHandler(QObject):
     """Creates and manages socket client threads.
 
     Outgoing signals:
@@ -185,7 +185,7 @@ class ThreadedSocketHandler(QObject):
     close_signal = Signal()
 
     def __init__(self):
-        super(ThreadedSocketHandler, self).__init__(None)
+        super(_ThreadedSocketHandler, self).__init__(None)
 
     @Slot()
     def start(self):
@@ -212,7 +212,7 @@ class ThreadedSocketHandler(QObject):
 
         thread = QThread()
         thread.setObjectName(str(client_id))
-        client = SocketClient(socket_descriptor, client_id)
+        client = _SocketClient(socket_descriptor, client_id)
         client.moveToThread(thread)
         thread.started.connect(client.run)  # noqa
 
@@ -332,4 +332,4 @@ class QThreadedServer(QBaseServer):
 
     def __init__(self, *args, **kwargs):
         super(QThreadedServer, self).__init__(*args, **kwargs)
-        self.set_handler_class(ThreadedSocketHandler)
+        self.set_handler_class(_ThreadedSocketHandler)
