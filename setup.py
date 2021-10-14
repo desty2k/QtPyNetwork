@@ -41,7 +41,7 @@ setup(
               'qtpy',
               'tcp'],
     project_urls={
-            "Issues": "https://github.com/desty2k/QtPyNetwork/issues",
-            "Docs": "https://desty2k.github.io/QtPyNetwork/",
-        }
+        "Issues": "https://github.com/desty2k/QtPyNetwork/issues",
+        "Docs": "https://desty2k.github.io/QtPyNetwork/",
+    }
 )
