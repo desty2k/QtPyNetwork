@@ -6,6 +6,8 @@ import logging
 
 from QtPyNetwork.server.BaseServer import QBaseServer
 
+__all__ = ["QBalancedServer"]
+
 
 class _SocketWorker(QObject):
     """_SocketWorker manages sockets and handles messages.
@@ -255,7 +257,7 @@ class _BalancedSocketHandler(QObject):
         - closed (): Handler closed all connections.
         - message (client_id: int, message: bytes): Message received.
         - error (client_id: int, error: str): Socket error.
-        - disconnected (client_id: int). Client disconnected.
+        - disconnected (client_id: int): Client disconnected.
 
     Incomming signals:
         - write (device_id: int, message: bytes): Emit to send message

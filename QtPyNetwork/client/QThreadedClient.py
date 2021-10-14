@@ -5,6 +5,8 @@ import logging
 from qtpy.QtNetwork import QTcpSocket, QHostAddress, QAbstractSocket
 from qtpy.QtCore import QObject, QIODevice, Signal, QMetaObject, Slot, QThread, Qt
 
+__all__ = ["QThreadedClient"]
+
 
 class _SocketClient(QObject):
     closed = Signal()

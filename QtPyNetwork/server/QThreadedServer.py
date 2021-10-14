@@ -6,6 +6,8 @@ import logging
 
 from QtPyNetwork.server.BaseServer import QBaseServer
 
+__all__ = ["QThreadedServer"]
+
 
 class _SocketClient(QObject):
     """Keeps socket in separate thread.
