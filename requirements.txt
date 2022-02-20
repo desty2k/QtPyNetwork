@@ -1,4 +1,4 @@
-QtPy
 PyQt5
+PyQt5-sip
+QtPy
 setuptools
-cryptography
