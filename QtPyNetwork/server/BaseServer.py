@@ -16,7 +16,7 @@ class TCPServer(QTcpServer):
 
     @Slot(int)
     def incomingConnection(self, socket_descriptor):
-        self.connection.emit(socket_descriptor)
+        self.connection.emit(int(socket_descriptor))
 
 
 class QBaseServer(QObject):
