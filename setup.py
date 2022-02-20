@@ -1,7 +1,9 @@
 from setuptools import find_packages, setup
 
 from QtPyNetwork import __version__
-from QtPyNetwork import __doc__ as doc
+
+with open("README.rst", "r", encoding="utf-8") as f:
+    doc = f.read()
 
 setup(
     name='QtPyNetwork',
