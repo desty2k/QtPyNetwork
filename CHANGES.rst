@@ -1,6 +1,11 @@
 Changelog
 =========
 
+- 0.6.1:
+    - Fix ``setSocketDescriptor`` failing on Python 3.10
+    - Get ``long_description`` for PyPi by reading ``README.rst``
+    - Remove unused depedency ``cryptography``
+
 - 0.6.0:
     - Use private classes where possible
     - Add `\_\_all__` variable to modules
