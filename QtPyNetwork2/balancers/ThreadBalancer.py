@@ -4,7 +4,7 @@ from qtpy.QtNetwork import QAbstractSocket, QUdpSocket
 import logging
 from struct import unpack, calcsize
 
-from .AbstractBalancer import AbstractBalancer
+from .AbstractBalancer import AbstractBalancer, HEADER, HEADER_SIZE
 
 
 class _Worker(QObject):
@@ -25,6 +25,9 @@ class _Worker(QObject):
         self.client_id = client_id
         self.socket_type = socket_type
         self.socket_descriptor = socket_descriptor
+
+        self.size_left = 0
+        self.data = b""
 
     @Slot()
     def start(self):
@@ -49,28 +52,47 @@ class _Worker(QObject):
         """
 
         while self.socket.bytesAvailable():
-            if self.client_id in self.data:
-                size_left = self.data.get(client_id).get("size_left")
-                data = socket.read(size_left)
-                size_left = size_left - len(data)
-                if size_left > 0:
-                    self.data[client_id]["size_left"] = size_left
-                    self.data[client_id]["data"] += data
+            if self.size_left > 0:
+                data = self.socket.read(self.size_left)
+                self.size_left = self.size_left - len(data)
+                if self.size_left > 0:
+                    self.data = self.data + data
                 else:
-                    data = self.data.get(client_id).get("data") + data
-                    del self.data[client_id]
-                    self.message.emit(client_id, data)
-
+                    self.readyRead.emit(self.client_id, self.data)
+                    self.data = b""
+                    self.size_left = 0
             else:
-                header = socket.read(HEADER_SIZE)
+                header = self.socket.read(HEADER_SIZE)
                 data_size = unpack(HEADER, header)[0]
-                message = socket.read(data_size)
-
-                if len(message) < data_size:
-                    data_size = data_size - len(message)
-                    self.data[client_id] = {"data": message, "size_left": data_size}
+                data = self.socket.read(data_size)
+                if len(data) < data_size:
+                    self.data = data
+                    self.size_left = data_size - len(data)
                 else:
-                    self.message.emit(client_id, message)
+                    self.readyRead.emit(self.client_id, data)
+            
+            # if self.client_id in self.data:
+            #     size_left = self.data.get(client_id).get("size_left")
+            #     data = socket.read(size_left)
+            #     size_left = size_left - len(data)
+            #     if size_left > 0:
+            #         self.data[client_id]["size_left"] = size_left
+            #         self.data[client_id]["data"] += data
+            #     else:
+            #         data = self.data.get(client_id).get("data") + data
+            #         del self.data[client_id]
+            #         self.message.emit(client_id, data)
+            #
+            # else:
+            #     header = socket.read(HEADER_SIZE)
+            #     data_size = unpack(HEADER, header)[0]
+            #     message = socket.read(data_size)
+            #
+            #     if len(message) < data_size:
+            #         data_size = data_size - len(message)
+            #         self.data[client_id] = {"data": message, "size_left": data_size}
+            #     else:
+            #         self.message.emit(client_id, message)
 
     @Slot()
     def __on_socket_disconnected(self):
@@ -102,11 +124,26 @@ class _Worker(QObject):
         self.error.emit(self.client_id, Exception(error))
 
 
-class NoBalancer(AbstractBalancer):
+class ThreadBalancer(AbstractBalancer):
 
+    @Slot(bytes)
+    def write_all(self, message: bytes):
+        pass
+
+    @Slot(int)
+    def disconnect(self, client_id: int):
+        pass
+
+    @Slot()
+    def close(self):
+        pass
+
+    @Slot(int, bytes)
+    def write(self, client_id: int, message: bytes):
+        pass
 
     def __init__(self):
-        super(NoBalancer, self).__init__()
+        super(ThreadBalancer, self).__init__()
         self.workers = []
 
     @Slot(type, int)
@@ -118,11 +155,16 @@ class NoBalancer(AbstractBalancer):
         # worker.connected.connect(self.__on_worker_socket_connected)
         # worker.readyRead.connect(self.__on_worker_socket_readyRead)
         # worker.disconnected.connect()
+        worker.connected.connect(self.connected.emit)
+        worker.disconnected.connect(self.disconnected.emit)
+        worker.readyRead.connect(self.message.emit)
+        worker.error.connect(self.client_error.emit)
 
         thread = QThread()
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
         self.workers.append((worker, thread))
+        thread.start()
 
     # @Slot(str, int)
     # def __on_worker_socket_connected(self, ip: str, port: int):
