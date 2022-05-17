@@ -7,7 +7,7 @@ import traceback
 
 from QtPyNetwork2.server import TCPServer
 from QtPyNetwork2.balancers import NoBalancer
-from QtPyNetwork2.models import Device
+from QtPyNetwork2.models import Client
 
 IP = "127.0.0.1"
 PORT = 12500
@@ -19,16 +19,21 @@ class Main(QObject):
         super(Main, self).__init__(None)
         self.logger = logging.getLogger(self.__class__.__name__)
 
-        self.balancer = NoBalancer()
-        self.server = TCPServer(self.balancer)
-        self.server.connected.connect(lambda client, ip, port: print(ip, port))
+        self.server = TCPServer(NoBalancer())
+        self.server.connected.connect(self.on_client_connected)
         self.server.disconnected.connect(lambda client: print(f"Client disconnected: {client.id()}"))
         self.server.message.connect(lambda client, data: print(f"Received data from client {client.id()}: {data}"))
         # self.server.disconnected.connect(self.on_disconnected)
         # self.server.message.connect(self.on_message)
 
+    @Slot()
     def start(self):
         self.server.start(IP, PORT)
+
+    @Slot(Client, str, int)
+    def on_client_connected(self, client, ip, port):
+        print(f"Hello new client! {client.id()} - {ip}:{port}")
+        client.write(b"Hello from server")
 
     # @Slot(Device, bytes)
     # def on_message(self, device, message: bytes):

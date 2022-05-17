@@ -1,8 +1,8 @@
 from qtpy.QtCore import Slot, Signal, QObject, QThread
 from qtpy.QtNetwork import QTcpServer, QHostAddress
 
-from QtPyNetwork.models import Device
-from QtPyNetwork.exceptions import NotConnectedError, ServerNotRunning
+from QtPyNetwork2.models import Client
+from QtPyNetwork2.exceptions import NotConnectedError, ServerNotRunning
 
 import logging
 
@@ -13,48 +13,49 @@ class AbstractServer(QObject):
     started = Signal(str, int)
     closed = Signal()
 
-    connected = Signal(Device, str, int)
-    disconnected = Signal(Device)
-    message = Signal(Device, bytes)
+    connected = Signal(Client, str, int)
+    disconnected = Signal(Client)
+    message = Signal(Client, bytes)
 
-    client_error = Signal(Device, Exception)
+    client_error = Signal(Client, Exception)
     server_error = Signal(Exception)
 
     def __init__(self, balancer: AbstractBalancer):
         super(AbstractServer, self).__init__()
-        self.devices: list[Device] = []
+        self.clients: list[Client] = []
         self.server: QObject = None
-        self.device_model = Device
+        self.client_model = Client
 
         self.balancer = balancer
-        self.balancer.connected.connect(self.__on_balancer_device_connected)
-        self.balancer.message.connect(self.__on_balancer_device_message)
-        self.balancer.error.connect(self.__on_balancer_device_error)
+        self.balancer.connected.connect(self.__on_balancer_client_connected)
+        self.balancer.disconnected.connect(self.__on_balancer_client_disconnected)
+        self.balancer.message.connect(self.__on_balancer_client_message)
+        self.balancer.client_error.connect(self.__on_balancer_client_error)
         self.balancer.closed.connect(self.on_closed)
 
     @Slot(int, str, int)
-    def __on_balancer_device_connected(self, device_id: int, ip: str, port: int):
-        device = self.device_model(self, device_id, ip, port)
-        self.devices.append(device)
-        self.on_connected(device, ip, port)
+    def __on_balancer_client_connected(self, client_id: int, ip: str, port: int):
+        client = self.client_model(self, client_id, ip, port)
+        self.clients.append(client)
+        self.on_connected(client, ip, port)
 
     @Slot(int, bytes)
-    def __on_balancer_device_message(self, device_id: int, message: bytes):
-        """When server receives message from device."""
-        self.on_message(self.get_device_by_id(device_id), message)
+    def __on_balancer_client_message(self, client_id: int, message: bytes):
+        """When server receives message from client."""
+        self.on_message(self.get_client_by_id(client_id), message)
 
     @Slot(int)
-    def __on_balancer_device_disconnected(self, device_id: int):
-        """When device disconnects from server."""
-        device = self.get_device_by_id(device_id)
-        device.set_connected(False)
-        if device in self.devices:
-            self.devices.remove(device)
-        self.on_disconnected(device)
+    def __on_balancer_client_disconnected(self, client_id: int):
+        """When client disconnects from server."""
+        client = self.get_client_by_id(client_id)
+        client.set_connected(False)
+        if client in self.clients:
+            self.clients.remove(client)
+        self.on_disconnected(client)
 
     @Slot(int, Exception)
-    def __on_balancer_device_error(self, device_id: int, error: Exception):
-        self.on_device_error(self.get_device_by_id(device_id), error)
+    def __on_balancer_client_error(self, client_id: int, error: Exception):
+        self.on_client_error(self.get_client_by_id(client_id), error)
 
     @Slot(str, int)
     def start(self, ip: str, port: int):
@@ -64,49 +65,49 @@ class AbstractServer(QObject):
     def on_started(self, ip: str, port: int):
         self.started.emit(ip, port)
 
-    @Slot(Device, str, int)
-    def on_connected(self, device: Device, ip: str, port: int):
+    @Slot(Client, str, int)
+    def on_connected(self, client: Client, ip: str, port: int):
         """Called when new client connects to server.
         Emits connected signal.
 
         Args:
-            device (Device): Device object.
+            client (Client): Client object.
             ip (str): Client ip address.
             port (int): Client port.
         """
-        self.connected.emit(device, ip, port)
+        self.connected.emit(client, ip, port)
 
-    @Slot(Device, bytes)
-    def on_message(self, device: Device, message: bytes):
+    @Slot(Client, bytes)
+    def on_message(self, client: Client, message: bytes):
         """Called when server receives message from client.
         Emits message signal.
 
         Args:
-            device (Device): Message sender.
+            client (Client): Message sender.
             message (bytes): Message.
         """
-        self.message.emit(device, message)
+        self.message.emit(client, message)
 
-    @Slot(Device)
-    def on_disconnected(self, device: Device):
-        """Called when device disconnects from server.
+    @Slot(Client)
+    def on_disconnected(self, client: Client):
+        """Called when client disconnects from server.
         Emits disconnected signal.
 
         Args:
-            device (Device): Disconnected device.
+            client (Client): Disconnected client.
         """
-        self.disconnected.emit(device)
+        self.disconnected.emit(client)
 
-    @Slot(Device, Exception)
-    def on_device_error(self, device: Device, error: Exception):
+    @Slot(Client, Exception)
+    def on_client_error(self, client: Client, error: Exception):
         """Called when server error occurs.
         Emits error signal.
 
         Args:
-            device (Device): Device object.
+            client (Client): Client object.
             error (Exception): Exception object.
         """
-        self.client_error.emit(device, error)
+        self.client_error.emit(client, error)
 
     @Slot(Exception)
     def on_server_error(self, error: Exception):
@@ -122,11 +123,30 @@ class AbstractServer(QObject):
     def on_closed(self):
         self.closed.emit()
 
+    @Slot(Client, bytes)
+    def write(self, client: Client, message: bytes):
+        """Sends message to client.
+
+        Args:
+            client (Client): Client object.
+            message (bytes): Message.
+        """
+        self.balancer.write(client.id(), message)
+
+    @Slot(bytes)
+    def write_all(self, message: bytes):
+        """Sends message to all clients.
+
+        Args:
+            message (bytes): Message.
+        """
+        self.balancer.write_all(message)
+
     @Slot(int)
-    def get_device_by_id(self, device_id: int):
-        for device in self.devices:
-            if device.id() == device_id:
-                return device
+    def get_client_by_id(self, client_id: int):
+        for client in self.clients:
+            if client.id() == client_id:
+                return client
 
     @Slot()
     def is_running(self) -> bool:
@@ -247,12 +267,12 @@ class AbstractServer(QObject):
 #     @Slot(int, bytes)
 #     def __on_handler_device_message(self, device_id: int, message: bytes):
 #         """When server receives message from bot."""
-#         self.on_message(self.get_device_by_id(device_id), message)
+#         self.on_message(self.get_client_by_id(device_id), message)
 #
 #     @Slot(int)
 #     def __on_handler_device_disconnected(self, device_id):
 #         """When bot disconnects from server."""
-#         device = self.get_device_by_id(device_id)
+#         device = self.get_client_by_id(device_id)
 #         device.set_connected(False)
 #         if device in self.__devices:
 #             self.__devices.remove(device)
@@ -260,7 +280,7 @@ class AbstractServer(QObject):
 #
 #     @Slot(int, str)
 #     def __on_handler_device_error(self, device_id, error):
-#         self.on_error(self.get_device_by_id(device_id), error)
+#         self.on_error(self.get_client_by_id(device_id), error)
 #
 #     @Slot(Device, str, int)
 #     def on_connected(self, device: Device, ip: str, port: int):
@@ -321,7 +341,7 @@ class AbstractServer(QObject):
 #
 #     @Slot(bytes)
 #     def write_all(self, data: bytes):
-#         """Write data to all devices."""
+#         """Write data to all clients."""
 #         if not self.__server or not self.__handler:
 #             raise ServerNotRunning("Server is not running")
 #         self.__handler.write_all.emit(data)
@@ -377,7 +397,7 @@ class AbstractServer(QObject):
 #         return True
 #
 #     @Slot(int)
-#     def get_device_by_id(self, device_id: int) -> Device:
+#     def get_client_by_id(self, device_id: int) -> Device:
 #         """Returns device with associated ID.
 #
 #         Args:
@@ -389,7 +409,7 @@ class AbstractServer(QObject):
 #         raise Exception("CLIENT-{} not found".format(device_id))
 #
 #     def get_devices(self):
-#         """Returns list with devices."""
+#         """Returns list with clients."""
 #         return self.__devices
 #
 #     def set_handler_class(self, handler):

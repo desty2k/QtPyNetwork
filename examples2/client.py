@@ -19,7 +19,7 @@ class Main(QObject):
         self.logger = logging.getLogger(self.__class__.__name__)
 
         self.cln = QThreadedClient()
-        # self.cln.message.connect(self.client_data_received)
+        self.cln.message.connect(self.on_message)
         self.cln.connected.connect(self.on_connected)
         self.cln.failed_to_connect.connect(self.close)
         self.cln.disconnected.connect(self.close)
@@ -29,6 +29,10 @@ class Main(QObject):
     def on_connected(self, ip: str, port: int):
         self.logger.info(f"Connected to {ip}:{port}")
         self.cln.write(b"Kick me plz")
+
+    @Slot(bytes)
+    def on_message(self, data: bytes):
+        self.logger.info(f"Received: {data}")
 
     @Slot()
     def close(self):

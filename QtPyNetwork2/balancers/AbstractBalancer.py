@@ -1,4 +1,5 @@
 from qtpy.QtCore import QObject, Signal, Slot
+from abc import ABC, abstractmethod
 
 import logging
 from struct import calcsize
@@ -11,7 +12,7 @@ class AbstractBalancer(QObject):
     disconnected = Signal(int)
     connected = Signal(int, str, int)
     message = Signal(int, bytes)
-    error = Signal(int, Exception)
+    client_error = Signal(int, Exception)
     closed = Signal()
 
     def __init__(self):
@@ -19,16 +20,29 @@ class AbstractBalancer(QObject):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.__socket_id = 0
 
+    @abstractmethod
     @Slot(type, int)
     def balance(self, socket_type: type, socket_descriptor: int):
         pass
 
+    @abstractmethod
     @Slot(int, bytes)
-    def write(self, device_id: int, message: bytes):
+    def write(self, client_id: int, message: bytes):
         pass
 
+    @abstractmethod
+    @Slot(bytes)
+    def write_all(self, message: bytes):
+        pass
+
+    @abstractmethod
     @Slot(int)
-    def close(self, device_id: int):
+    def disconnect(self, client_id: int):
+        pass
+
+    @abstractmethod
+    @Slot()
+    def close(self):
         pass
 
     @Slot()

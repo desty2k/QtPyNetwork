@@ -1,9 +1,9 @@
 from qtpy.QtCore import Slot, Signal
-from qtpy.QtNetwork import QAbstractSocket, QUdpSocket
+from qtpy.QtNetwork import QAbstractSocket
 
-from struct import unpack
+from struct import unpack, pack
 
-from .AbstractBalancer import AbstractBalancer
+from .AbstractBalancer import AbstractBalancer, HEADER, HEADER_SIZE
 
 
 class NoBalancer(AbstractBalancer):
@@ -67,9 +67,6 @@ class NoBalancer(AbstractBalancer):
     def __on_socket_disconnected(self):
         """Handle socket disconnection.
 
-        Args:
-            conn (QTcpSocket): Socket object.
-
         Note:
             Emits disconnected signal.
         """
@@ -87,14 +84,65 @@ class NoBalancer(AbstractBalancer):
     def __on_socket_error(self):
         """Handle socket errors.
 
-        Args:
-            conn (QTcpSocket): Socket object.
-
         Note:
             Emits error signal.
         """
         socket = self.sender()
         client_id = int(socket.objectName())
         error = socket.errorString()
-        self.error.emit(client_id, Exception(error))
+        self.client_error.emit(client_id, Exception(error))
+
+    @Slot(int, bytes)
+    def write(self, client_id: int, data: bytes):
+        """Write data to socket.
+
+        Args:
+            client_id (int): Client ID.
+            data (bytes): Data to write.
+        """
+        for socket in self.sockets:
+            if int(socket.objectName()) == client_id:
+                data = pack(HEADER, len(data)) + data
+                socket.write(data)
+                socket.flush()
+                print(f"Written {len(data)} bytes to {socket.objectName()}")
+                return
+        print(f"{client_id} - {data}")
+        print([socket.objectName() for socket in self.sockets])
+        self.client_error.emit(client_id, Exception(f"Client {client_id} not found"))
+
+    @Slot(bytes)
+    def write_all(self, message: bytes):
+        """Write data to all sockets.
+
+        Args:
+            message (bytes): Data to write.
+        """
+        for socket in self.sockets:
+            socket.write(message)
+            socket.flush()
+
+    @Slot(int)
+    def disconnect(self, client_id: int):
+        """Disconnect socket.
+
+        Args:
+            client_id (int): Client ID.
+        """
+        for socket in self.sockets:
+            if int(socket.objectName()) == client_id:
+                socket.disconnectFromHost()
+                return
+        self.client_error.emit(client_id, Exception(f"Client {client_id} not found"))
+
+    @Slot()
+    def close(self):
+        """Close all sockets."""
+        for socket in self.sockets:
+            try:
+                socket.disconnectFromHost()
+                socket.close()
+            except RuntimeError:
+                pass
+        self.sockets.clear()
 
