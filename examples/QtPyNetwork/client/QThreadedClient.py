@@ -125,11 +125,8 @@ class _SocketClient(QObject):
 
     @Slot()
     def close(self):
-        print("Pre _disconnect")
         self._disconnect()
-        print("Pre tcpsocket.close")
         self.tcpSocket.close()
-        print("Pre closed.emit")
         self.closed.emit()
 
 
@@ -260,11 +257,8 @@ class QThreadedClient(QObject):
     def close(self):
         """Disconnect from server and close socket."""
         if self.__client and self.__client_thread:
-            print("__client and __client_thread")
             self.__client.close_signal.emit()
-            print("Signal emited")
             self.__client_thread.quit()
-            print("_client_thread quited")
         else:
             self.error.emit("Client not running")
 

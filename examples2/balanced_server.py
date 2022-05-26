@@ -5,8 +5,8 @@ import sys
 import logging
 import traceback
 
-from QtPyNetwork2.server import TCPServer
-from QtPyNetwork2.balancers import ThreadPoolBalancer
+from QtPyNetwork.server import TCPServer
+from QtPyNetwork.balancer import ThreadPoolBalancer
 from QtPyNetwork.models import Device
 
 IP = "127.0.0.1"

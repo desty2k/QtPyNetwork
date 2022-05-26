@@ -5,9 +5,9 @@ import sys
 import logging
 import traceback
 
-from QtPyNetwork2.server import TCPServer
-from QtPyNetwork2.balancers import NoBalancer
-from QtPyNetwork2.models import Client
+from QtPyNetwork.server import TCPServer
+from QtPyNetwork.balancer import NoBalancer
+from QtPyNetwork.models import Client
 
 IP = "127.0.0.1"
 PORT = 12500

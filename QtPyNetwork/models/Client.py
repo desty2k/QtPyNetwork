@@ -49,8 +49,8 @@ class Client(QObject):
         return self.__connected
 
     @Slot()
-    def kick(self):
-        self.server().kick(self)
+    def disconnect(self):
+        self.server().disconnect(self)
 
     @Slot(bytes)
     def write(self, message: bytes):

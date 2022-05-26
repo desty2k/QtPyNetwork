@@ -5,8 +5,9 @@ import sys
 import logging
 import traceback
 
-from QtPyNetwork.server import QThreadedServer
-from QtPyNetwork.models import Device
+from QtPyNetwork.server import TCPServer
+from QtPyNetwork.balancer import ThreadBalancer
+from QtPyNetwork.models import Client
 
 IP = "127.0.0.1"
 PORT = 12500
@@ -16,32 +17,31 @@ class Main(QObject):
 
     def __init__(self):
         super(Main, self).__init__(None)
-
-    def setup(self):
         self.logger = logging.getLogger(self.__class__.__name__)
 
-        self.srv = QThreadedServer()
-        self.srv.connected.connect(lambda device, ip, port: device.write(b"Some important data"))
-        self.srv.disconnected.connect(self.on_disconnected)
-        self.srv.message.connect(self.on_message)
-        self.srv.start(IP, PORT)
+        self.server = TCPServer(ThreadBalancer())
+        self.server.connected.connect(lambda device, ip, port: device.write(b"Some important data"))
+        self.server.disconnected.connect(self.on_disconnected)
+        self.server.message.connect(self.on_message)
+        self.server.start(IP, PORT)
 
-    @Slot(Device, bytes)
-    def on_message(self, device, message: bytes):
-        self.logger.info("Received {}: {}".format(device.id(), message))
+    @Slot(Client, bytes)
+    def on_message(self, client: Client, message: bytes):
+        self.logger.info("Received {}: {}".format(client.id(), message))
         if message.decode() == "Kick me plz":
-            device.kick()
+            client.write(b"I'm kicked")
+            client.disconnect()
 
-    @Slot(Device)
+    @Slot(Client)
     def on_disconnected(self, device):
         self.logger.info("Disconnected: {}; Connected: {}".format(device.id(), device.is_connected()))
-        self.close()
+        # self.close()
 
     @Slot()
     def close(self):
-        self.srv.close()
-        while self.srv.is_running():
-            self.srv.wait()
+        self.server.close()
+        while self.server.is_running():
+            self.server.wait()
         QApplication.instance().quit()
 
 
@@ -62,5 +62,4 @@ if __name__ == '__main__':
     app = QCoreApplication(sys.argv)
 
     main = Main()
-    main.setup()
     sys.exit(app.exec_())

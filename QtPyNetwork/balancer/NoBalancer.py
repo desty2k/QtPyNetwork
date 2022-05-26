@@ -105,10 +105,7 @@ class NoBalancer(AbstractBalancer):
                 data = pack(HEADER, len(data)) + data
                 socket.write(data)
                 socket.flush()
-                print(f"Written {len(data)} bytes to {socket.objectName()}")
                 return
-        print(f"{client_id} - {data}")
-        print([socket.objectName() for socket in self.sockets])
         self.client_error.emit(client_id, Exception(f"Client {client_id} not found"))
 
     @Slot(bytes)

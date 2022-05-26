@@ -1,12 +1,12 @@
 from qtpy.QtCore import Slot, Signal, QObject, QThread
 from qtpy.QtNetwork import QTcpServer, QHostAddress
 
-from QtPyNetwork2.models import Client
-from QtPyNetwork2.exceptions import NotConnectedError, ServerNotRunning
+from QtPyNetwork.models import Client
+from QtPyNetwork.exceptions import NotConnectedError, ServerNotRunning
 
 import logging
 
-from QtPyNetwork2.balancers import AbstractBalancer
+from QtPyNetwork.balancer import AbstractBalancer
 
 
 class AbstractServer(QObject):
@@ -24,7 +24,7 @@ class AbstractServer(QObject):
         super(AbstractServer, self).__init__()
         self.clients: list[Client] = []
         self.server: QObject = None
-        self.client_model = Client
+        self.__client_model = Client
 
         self.balancer = balancer
         self.balancer.connected.connect(self.__on_balancer_client_connected)
@@ -35,7 +35,7 @@ class AbstractServer(QObject):
 
     @Slot(int, str, int)
     def __on_balancer_client_connected(self, client_id: int, ip: str, port: int):
-        client = self.client_model(self, client_id, ip, port)
+        client = self.__client_model(self, client_id, ip, port)
         self.clients.append(client)
         self.on_connected(client, ip, port)
 
@@ -48,10 +48,10 @@ class AbstractServer(QObject):
     def __on_balancer_client_disconnected(self, client_id: int):
         """When client disconnects from server."""
         client = self.get_client_by_id(client_id)
-        client.set_connected(False)
-        if client in self.clients:
+        if client:
+            client.set_connected(False)
             self.clients.remove(client)
-        self.on_disconnected(client)
+            self.on_disconnected(client)
 
     @Slot(int, Exception)
     def __on_balancer_client_error(self, client_id: int, error: Exception):
@@ -123,6 +123,15 @@ class AbstractServer(QObject):
     def on_closed(self):
         self.closed.emit()
 
+    @Slot(Client)
+    def disconnect(self, client: Client):
+        """Disconnects client from server.
+
+        Args:
+            client (Client): Client object.
+        """
+        self.balancer.disconnect(client.id())
+
     @Slot(Client, bytes)
     def write(self, client: Client, message: bytes):
         """Sends message to client.
@@ -147,6 +156,12 @@ class AbstractServer(QObject):
         for client in self.clients:
             if client.id() == client_id:
                 return client
+
+    @Slot(Client)
+    def set_client_model(self, model: Client):
+        if not issubclass(model, Client):
+            raise TypeError('model must be subclass of Client')
+        self.__client_model = model
 
     @Slot()
     def is_running(self) -> bool:

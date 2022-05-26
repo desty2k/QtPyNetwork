@@ -1,1 +1,1 @@
-from .QThreadedClient import QThreadedClient
+from .TCPClient import TCPClient

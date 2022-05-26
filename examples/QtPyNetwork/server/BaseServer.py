@@ -166,7 +166,7 @@ class QBaseServer(QObject):
 
     @Slot(bytes)
     def write_all(self, data: bytes):
-        """Write data to all devices."""
+        """Write data to all clients."""
         if not self.__server or not self.__handler:
             raise ServerNotRunning("Server is not running")
         self.__handler.write_all.emit(data)
@@ -234,7 +234,7 @@ class QBaseServer(QObject):
         raise Exception("CLIENT-{} not found".format(device_id))
 
     def get_devices(self):
-        """Returns list with devices."""
+        """Returns list with clients."""
         return self.__devices
 
     def set_handler_class(self, handler):
