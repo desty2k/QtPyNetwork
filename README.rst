@@ -7,32 +7,106 @@ QtPyNetwork is a small abstraction layer for sending and receiving messages usin
 
 `Check out the complete documentation. <https://desty2k.github.io/QtPyNetwork/readme.html>`__
 
-Features
---------
+Server
+------
 
-- every data write and read call is executed inside thread
-- signals for each event - connected, disconnected, error, etc.
+Each server has its own balancer.
 
-There are two servers available:
+Servers:
+~~~~~~~~
 
-- QBalancedServer
-- QThreadedServer
+- TCPServer - listen for TCP connections
 
-The first one has constant amount of threads.
-When new client connects, server checks which worker has the least amount of active sockets and passes socket
-descriptor to that thread. QThreadedServer creates new thread for each connected device.
+Balancers:
+~~~~~~~~~~
 
-QThreadedClient is socket client, that keeps socket in separate thread.
+- NoBalancer - sockets are stored in main thread
+- ThreadBalancer - each socket lives in its own thread, which is created dynamically
+- ThreadPoolBalancer - constant amount of threads, new sockets are created in threads with least load
+
+
+Client
+------
+
+- TCPClient
+- ThreadedTCPClient
+
 
 Usage
 -----
 
 See examples directory for client and server code samples.
-You can use both composition and inheritance to create client and server.
 
-Client
+TCP Client
 ~~~~~~
 
+
+
+.. code-block:: python
+
+    from qtpy.QtWidgets import QApplication
+    from qtpy.QtCore import QObject, Slot, QCoreApplication, qInstallMessageHandler
+
+    import sys
+    import logging
+
+    from QtPyNetwork.client import TCPClient
+
+    IP = "127.0.0.1"
+    PORT = 12500
+
+
+    class Main(QObject):
+
+        def __init__(self):
+            super(Main, self).__init__(None)
+            self.logger = logging.getLogger(self.__class__.__name__)
+
+            self.client = TCPClient()
+            self.client.message.connect(self.on_message)
+            self.client.connected.connect(self.on_connected)
+            self.client.failed_to_connect.connect(self.on_failed_to_connect)
+            self.client.disconnected.connect(self.close)
+
+        @Slot()
+        def start(self):
+            self.client.start(IP, PORT)
+
+        @Slot(str, int)
+        def on_connected(self, ip: str, port: int):
+            self.logger.info(f"Connected to {ip}:{port}")
+            self.client.write(b"Kick me plz")
+
+        @Slot(bytes)
+        def on_message(self, data: bytes):
+            self.logger.info(f"Received: {data}")
+
+        @Slot()
+        def on_failed_to_connect(self):
+            self.logger.error("Failed to connect")
+
+        @Slot()
+        def close(self):
+            self.client.close()
+            QApplication.instance().quit()
+
+
+    if __name__ == '__main__':
+        logging.basicConfig(
+            level=logging.NOTSET,
+            format="%(asctime)s [%(threadName)s] [%(name)s] [%(levelname)s] %(message)s",
+            handlers=[logging.StreamHandler()])
+        logging.getLogger().debug("Logger enabled")
+
+        app = QCoreApplication(sys.argv)
+        main = Main()
+        main.start()
+        sys.exit(app.exec_())
+
+
+
+TCPServer + ThreadPoolBalancer
+~~~~~~
 
 .. code-block:: python
 
@@ -41,88 +115,52 @@ Client
 
     import sys
     import logging
+    import traceback
 
-    from QtPyNetwork.client import QThreadedClient
+    from QtPyNetwork.server import TCPServer
+    from QtPyNetwork.balancer import ThreadPoolBalancer
+    from QtPyNetwork.models import Client
 
-    IP, PORT = "127.0.0.1", 12500
+    IP = "127.0.0.1"
+    PORT = 12500
 
 
     class Main(QObject):
 
         def __init__(self):
             super(Main, self).__init__(None)
-
-        def setup(self):
             self.logger = logging.getLogger(self.__class__.__name__)
+            # declare server using ThreadPoolBalancer
+            self.server = TCPServer(ThreadPoolBalancer(threads=8))
+            # connect signals
+            self.server.connected.connect(lambda client, ip, port: client.write(b"Some important data"))
+            self.server.disconnected.connect(self.on_disconnected)
+            self.server.message.connect(self.on_message)
 
-            self.cln = QThreadedClient()
-            self.cln.message.connect(self.on_message)
-            self.cln.failed_to_connect.connect(self.close)
-            self.cln.disconnected.connect(self.close)
-            self.cln.start(IP, PORT)
+        @Slot()
+        def setup(self):
+            # start server
+            self.server.start(IP, PORT)
 
-        @Slot(bytes)
-        def on_message(self, data: bytes):
-            self.logger.info(data)
+        @Slot(Client, bytes)
+        def on_message(self, client: Client, message: bytes):
+            # this code will be run everyu time client sends data
+            self.logger.info("Received {}: {}".format(client.id(), message))
+            if message.decode() == "Kick me plz":
+                client.disconnect()
+
+        @Slot(Client)
+        def on_disconnected(self, client: Client):
+            # do some actions when client disconnects form server
+            self.logger.info("Disconnected: {}; Connected: {}".format(client.id(), client.is_connected()))
+            self.close()
 
         @Slot()
         def close(self):
-            self.cln.close()
-            while self.cln.is_running():
-                self.cln.wait()
+            self.server.close()
+            while self.server.is_running():
+                self.server.wait()
             QApplication.instance().quit()
-
-
-    if __name__ == '__main__':
-        logging.basicConfig(level=logging.NOTSET)
-        app = QCoreApplication(sys.argv)
-
-        main = Main()
-        main.setup()
-        sys.exit(app.exec_())
-
-
-Server
-~~~~~~
-
-.. code-block:: python
-
-    from qtpy.QtCore import QObject, Slot, QCoreApplication
-
-    import sys
-    import logging
-
-    from QtPyNetwork.server import QBalancedServer
-    from QtPyNetwork.models import Device
-
-    IP, PORT = "127.0.0.1", 12500
-
-
-    class Main(QBalancedServer):
-
-        def __init__(self):
-            super(Main, self).__init__(None)
-            self.logger = logging.getLogger(self.__class__.__name__)
-
-        @Slot(Device)
-        def on_connected(device: Device):
-            self.logger.info("New device connected: {}".format(device.id()))
-
-        @Slot(Device, bytes)
-        def on_message(self, device: Device, message: bytes):
-            self.logger.info("Received from {}: {}".format(device.id(), message))
-
-        @Slot(Device)
-        def on_disconnected(self, device: Device):
-            self.logger.info("Device {} disconnected".format(device.id()))
-            self.close()
-
-    if __name__ == '__main__':
-        logging.basicConfig(level=logging.NOTSET)
-        app = QCoreApplication(sys.argv)
-        main = Main()
-        main.start(IP, PORT)
-        sys.exit(app.exec_())
 
 .. |Docs Status| image:: https://github.com/desty2k/QtPyNetwork/workflows/docs/badge.svg
    :target: https://desty2k.github.io/QtPyNetwork/

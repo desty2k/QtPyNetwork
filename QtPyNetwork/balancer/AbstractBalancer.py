@@ -22,7 +22,7 @@ class AbstractBalancer(QObject):
 
     @abstractmethod
     @Slot(type, int)
-    def balance(self, socket_type: type, socket_descriptor: int):
+    def balance(self, socket_type: type, socket_descriptor: int) -> int:
         pass
 
     @abstractmethod
@@ -42,7 +42,17 @@ class AbstractBalancer(QObject):
 
     @abstractmethod
     @Slot()
-    def close(self):
+    def close(self) -> None:
+        pass
+
+    @abstractmethod
+    @Slot()
+    def is_running(self) -> bool:
+        pass
+
+    @abstractmethod
+    @Slot()
+    def wait(self) -> None:
         pass
 
     @Slot()

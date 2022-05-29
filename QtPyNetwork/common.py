@@ -1,48 +1,66 @@
-from qtpy.QtNetwork import QAbstractSocket
+from qtpy.QtNetwork import QAbstractSocket, QUdpSocket
+from qtpy.QtCore import QObject, QTimer, Signal, Slot
 from struct import unpack, calcsize, pack
 
 HEADER = '!L'
 HEADER_SIZE = calcsize(HEADER)
 
 
-def read(socket: QAbstractSocket, buffer: bytes, size_left: int) -> (bytes, int):
-    """Read data from socket.
+class DataBuffer(QObject):
+    """Small wrapper around QT's QAbstractSocket to make it easier to use.
+    Stores data in a buffer and emits signals when data is ready."""
 
-    Args:
-        socket (QAbstractSocket): Socket to read from.
-        buffer (bytes): Buffer to read into.
-        size_left (int): Size left to read.
+    data = Signal(bytes)
 
-    Returns:
-        bytes: Read data.
-    """
-    while socket.bytesAvailable():
-        print(f"Reading {size_left} bytes with buffer {buffer}")
-        if size_left > 0:
-            data = socket.read(size_left)
-            size_left = size_left - len(data)
+    def __init__(self, socket: QAbstractSocket):
+        super().__init__()
+        self.__data = b""
+        self.__size_left = 0
+        self.__socket = socket
+        self.__socket.readyRead.connect(self.on_socket_ready_read)
+
+    @Slot()
+    def on_socket_ready_read(self) -> None:
+        """Read data from socket."""
+        # while self.__socket.hasPendingDatagrams():
+        #     data = self.__socket.readDatagram(self.__socket.pendingDatagramSize())
+        #     print(data)
+        #     self.data.emit(data)
+
+        while self.__socket.bytesAvailable():
+            size_left = self.__size_left
+            # print(f"Left: {size_left}")
             if size_left > 0:
-                buffer += data
+                data = self.__socket.read(size_left)
+                size_left = size_left - len(data)
+                # print(f"ContinueR: {size_left}, {len(data)}")
+                if size_left > 0:
+                    self.__data += data
+                    self.__size_left = size_left
+                else:
+                    data = self.__data + data
+                    self.__data = b""
+                    self.__size_left = 0
+                    self.data.emit(data)
             else:
-                return buffer + data, 0
-        else:
-            header = socket.read(HEADER_SIZE)
-            data_size = unpack(HEADER, header)[0]
-            data = socket.read(data_size)
-            if len(data) < data_size:
-                buffer = data
-                size_left = data_size
-            else:
-                return data, 0
+                header = self.__socket.read(HEADER_SIZE)
+                data_size = unpack(HEADER, header)[0]
+                data = self.__socket.read(data_size)
+                # print(f"EmptyB: {header}, {data_size}")
+                if len(data) < data_size:
+                    self.__data = data
+                    self.__size_left = data_size - len(data)
+                else:
+                    self.data.emit(data)
 
+    @Slot(bytes)
+    def write(self, data: bytes) -> None:
+        """Write data to socket.
 
-def write(socket: QAbstractSocket, data: bytes) -> None:
-    """Write data to socket.
+        Args:
+            data (bytes): Data to write.
+        """
+        data = pack(HEADER, len(data)) + data
+        self.__socket.write(data)
+        self.__socket.flush()
 
-    Args:
-        socket (QAbstractSocket): Socket to write to.
-        data (bytes): Data to write.
-    """
-    print(f"Writing {len(data)} bytes with buffer {data}")
-    data = pack(HEADER, len(data)) + data
-    socket.write(data)

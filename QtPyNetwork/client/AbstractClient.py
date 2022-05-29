@@ -1,4 +1,5 @@
 from qtpy.QtCore import Slot, Signal, QObject
+from qtpy.QtNetwork import QAbstractSocket
 
 from abc import abstractmethod
 
@@ -12,10 +13,9 @@ class AbstractClient(QObject):
     closed = Signal()
     failed_to_connect = Signal()
 
-    def __init__(self, timeout: int = 5):
+    def __init__(self):
         super(AbstractClient, self).__init__()
-        self._socket = None
-        self._timeout = timeout
+        self._socket: QAbstractSocket = None
 
     @abstractmethod
     @Slot(str, int)
@@ -89,6 +89,11 @@ class AbstractClient(QObject):
             self._socket.close()
             self._socket = None
         self.closed.emit()
+
+    @abstractmethod
+    @Slot()
+    def wait(self):
+        pass
 
     @Slot()
     def is_running(self):

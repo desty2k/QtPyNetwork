@@ -7,7 +7,7 @@ import traceback
 
 from QtPyNetwork.server import TCPServer
 from QtPyNetwork.balancer import ThreadPoolBalancer
-from QtPyNetwork.models import Device
+from QtPyNetwork.models import Client
 
 IP = "127.0.0.1"
 PORT = 12500
@@ -19,31 +19,31 @@ class Main(QObject):
         super(Main, self).__init__(None)
         self.logger = logging.getLogger(self.__class__.__name__)
 
-        self.balancer = ThreadPoolBalancer(threads=8)
-        self.server = TCPServer(self.balancer)
-        self.server.connected.connect(lambda device, ip, port: device.write(b"Some important data"))
+        self.server = TCPServer(ThreadPoolBalancer(threads=8))
+        self.server.connected.connect(lambda client, ip, port: client.write(b"Some important data"))
         self.server.disconnected.connect(self.on_disconnected)
         self.server.message.connect(self.on_message)
 
+    @Slot()
     def setup(self):
         self.server.start(IP, PORT)
 
-    @Slot(Device, bytes)
-    def on_message(self, device, message: bytes):
-        self.logger.info("Received {}: {}".format(device.id(), message))
-        if message.decode() == "Kick me plz":
-            device.kick()
+    @Slot(Client, bytes)
+    def on_message(self, client: Client, message: bytes):
+        self.logger.info("Received {}: {}".format(client.id(), message))
+        # if message.decode() == "Kick me plz":
+        #     client.disconnect()
 
-    @Slot(Device)
-    def on_disconnected(self, device):
-        self.logger.info("Disconnected: {}; Connected: {}".format(device.id(), device.is_connected()))
-        self.close()
+    @Slot(Client)
+    def on_disconnected(self, client: Client):
+        self.logger.info("Disconnected: {}; Connected: {}".format(client.id(), client.is_connected()))
+        # self.close()
 
     @Slot()
     def close(self):
-        self.srv.close()
-        while self.srv.is_running():
-            self.srv.wait()
+        self.server.close()
+        while self.server.is_running():
+            self.server.wait()
         QApplication.instance().quit()
 
 

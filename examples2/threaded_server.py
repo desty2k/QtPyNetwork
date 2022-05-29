@@ -29,8 +29,14 @@ class Main(QObject):
     def on_message(self, client: Client, message: bytes):
         self.logger.info("Received {}: {}".format(client.id(), message))
         if message.decode() == "Kick me plz":
-            client.write(b"I'm kicked")
-            client.disconnect()
+            data = b"Some data"
+            # client.write(b"I'm kicked")
+            for i in range(20):
+                client.write(data)
+                data += data
+
+                # client.write(b"I'm kicked")
+            # client.disconnect()
 
     @Slot(Client)
     def on_disconnected(self, device):

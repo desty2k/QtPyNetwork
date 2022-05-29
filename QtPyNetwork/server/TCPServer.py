@@ -34,3 +34,11 @@ class TCPServer(AbstractServer):
     @Slot()
     def close(self):
         self.server.close()
+
+    @Slot()
+    def is_running(self) -> bool:
+        return self.server.isListening() and self.balancer.is_running()
+
+    @Slot()
+    def wait(self):
+        return self.balancer.wait()

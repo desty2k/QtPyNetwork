@@ -1,35 +1,44 @@
 from qtpy.QtNetwork import QAbstractSocket, QTcpSocket, QHostAddress
-from qtpy.QtCore import Signal, Slot, QTimer
+from qtpy.QtCore import Signal, Slot, QTimer, QDeadlineTimer
 
-from QtPyNetwork.common import read, write
+from QtPyNetwork.common import DataBuffer
 from .AbstractClient import AbstractClient
 
 import logging
 
 
 class TCPClient(AbstractClient):
-    def __init__(self, timeout: int = 2):
-        super(TCPClient, self).__init__(timeout)
+    def __init__(self):
+        super(TCPClient, self).__init__()
         self._logger = logging.getLogger(self.__class__.__name__)
-        self._data = b""
-        self._size_left = 0
+        self.__buffer = None
 
     @Slot(str, int)
-    def start(self, ip: str, port: int):
+    def start(self, ip: str, port: int, timeout: int = 5):
+        if self._socket:
+            self._logger.info(f"Closing and connecting to {ip}:{port}")
+            self._socket.close()
+            self._socket = None
+            self.__buffer = None
+
         self._socket = QTcpSocket(self)
+
+        self.__buffer = DataBuffer(self._socket)
+        self.__buffer.data.connect(self.on_message)
+
         self._socket.connected.connect(self.__on_socket_connected)
         self._socket.disconnected.connect(self.__on_socket_disconnected)
-        self._socket.readyRead.connect(self.__on_socket_ready_read)
         self._socket.error.connect(self.__on_socket_error)
         self._socket.connectToHost(QHostAddress(ip), port)
         self._logger.debug(f"Connecting to {ip}:{port}")
-        QTimer.singleShot(self._timeout * 1000, self.__check_connected)
-        self._logger.debug(f"Started connection timer with timeout {self._timeout} seconds")
+        self._logger.debug(f"Starting connection timer with timeout {timeout} seconds")
+        QTimer.singleShot(timeout * 1000, self.__check_connected)
+        # self.__check_connected(timeout)
 
     @Slot(bytes)
     def write(self, data: bytes):
-        if self._socket.state() == QAbstractSocket.ConnectedState:
-            write(self._socket, data)
+        if self.__buffer:
+            self.__buffer.write(data)
 
     @Slot()
     def __on_socket_connected(self):
@@ -44,28 +53,27 @@ class TCPClient(AbstractClient):
         self.on_disconnected()
 
     @Slot()
-    def __on_socket_ready_read(self):
-        data, size_left = read(self._socket, self._data, self._size_left)
-        print(f"TCPClient left: {size_left}, received: {data}")
-        if size_left == 0:
-            self._size_left = 0
-            self._data = b""
-            self.on_message(data)
-        else:
-            self._data = data
-            self._size_left = size_left
-
-    @Slot()
     def __on_socket_error(self):
         """Handle socket errors.
 
         Note:
             Emits error signal.
         """
-        error = self._socket.errorString()
-        self.error.emit(Exception(error))
+        if self._socket:
+            error = self._socket.errorString()
+            self.error.emit(Exception(error))
 
+    @Slot()
     def __check_connected(self):
-        if not self._socket.state() == QAbstractSocket.ConnectedState:
+        if self._socket and self._socket.state() != QAbstractSocket.SocketState.ConnectedState:
             self._socket.close()
             self.on_failed_to_connect()
+
+    @Slot(int)
+    def wait(self, timeout: int = 5):
+        """Wait for client to close."""
+        timer = QDeadlineTimer(1000 * timeout)
+        while not timer.hasExpired():
+            if self._socket.state() != QAbstractSocket.SocketState.ConnectedState:
+                break
+

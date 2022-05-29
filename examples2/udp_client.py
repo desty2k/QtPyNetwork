@@ -4,7 +4,8 @@ from qtpy.QtCore import QObject, Slot, QCoreApplication, qInstallMessageHandler
 import sys
 import logging
 
-from QtPyNetwork.client import TCPClient
+from QtPyNetwork.client import UDPClient
+from qrainbowstyle.extras import qt_message_handler
 
 IP = "127.0.0.1"
 PORT = 12500
@@ -16,14 +17,11 @@ class Main(QObject):
         super(Main, self).__init__(None)
         self.logger = logging.getLogger(self.__class__.__name__)
 
-        self.client = TCPClient()
-        self.client.message.connect(self.on_message)
+        self.client = UDPClient()
+        # self.client.message.connect(self.on_message)
         self.client.connected.connect(self.on_connected)
         self.client.failed_to_connect.connect(self.on_failed_to_connect)
         self.client.disconnected.connect(self.close)
-
-    @Slot()
-    def start(self):
         self.client.start(IP, PORT)
 
     @Slot(str, int)
@@ -52,7 +50,8 @@ if __name__ == '__main__':
         handlers=[logging.StreamHandler()])
     logging.getLogger().debug("Logger enabled")
 
+    qInstallMessageHandler(qt_message_handler)
     app = QCoreApplication(sys.argv)
+
     main = Main()
-    main.start()
     sys.exit(app.exec_())

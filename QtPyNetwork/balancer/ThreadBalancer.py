@@ -1,9 +1,9 @@
 from qtpy.QtCore import Slot, Signal, QObject, QThread
-from qtpy.QtNetwork import QAbstractSocket, QUdpSocket
+from qtpy.QtNetwork import QAbstractSocket
 
 import logging
 
-from QtPyNetwork.common import read, write
+from QtPyNetwork.common import DataBuffer
 from .AbstractBalancer import AbstractBalancer
 
 
@@ -12,16 +12,16 @@ class _Worker(QObject):
     connected = Signal(int, str, int)
     ready_read = Signal(int, bytes)
     error = Signal(int, Exception)
-    closed = Signal(int)
+    closed = Signal()
 
     close_signal = Signal()
-
     write_signal = Signal(bytes)
 
     def __init__(self, client_id, socket_type: type, socket_descriptor: int):
         super(_Worker, self).__init__()
         self.logger = logging.getLogger(f"ThreadBalancerWorker-{client_id}")
         self.socket: QAbstractSocket = None
+        self.buffer = None
         self.client_id = client_id
         self.socket_type = socket_type
         self.socket_descriptor = socket_descriptor
@@ -37,51 +37,17 @@ class _Worker(QObject):
         socket: QAbstractSocket = self.socket_type()
         socket.setParent(None)
         if socket.setSocketDescriptor(self.socket_descriptor):
-            socket.readyRead.connect(self.__on_socket_ready_read)
+            # socket.readyRead.connect(self.__on_socket_ready_read)
             socket.disconnected.connect(self.__on_socket_disconnected)
             socket.error.connect(self.__on_socket_error)
             socket.setObjectName(str(self.client_id))
             self.socket = socket
+            self.buffer = DataBuffer(self.socket)
+            self.buffer.data.connect(lambda data: self.ready_read.emit(self.client_id, data))
+
             self.logger.debug(f"New client - {socket.objectName()} - "
                               f"{socket.peerAddress().toString()} - {socket.peerPort()}")
             self.connected.emit(int(socket.objectName()), socket.peerAddress().toString(), socket.peerPort())
-
-    @Slot()
-    def __on_socket_ready_read(self):
-        """Handle socket messages.
-
-        Note:
-            Emits message signal.
-        """
-        data, size_left = read(self.socket, self.data, self.size_left)
-        if size_left == 0:
-            self._size_left = 0
-            self._data = b""
-            self.ready_read.emit(self.client_id, data)
-        else:
-            self._data = data
-            self._size_left = size_left
-
-
-        # while self.socket.bytesAvailable():
-        #     if self.size_left > 0:
-        #         data = self.socket.read(self.size_left)
-        #         self.size_left = self.size_left - len(data)
-        #         if self.size_left > 0:
-        #             self.data = self.data + data
-        #         else:
-        #             self.ready_read.emit(self.client_id, self.data)
-        #             self.data = b""
-        #             self.size_left = 0
-        #     else:
-        #         header = self.socket.read(HEADER_SIZE)
-        #         data_size = unpack(HEADER, header)[0]
-        #         data = self.socket.read(data_size)
-        #         if len(data) < data_size:
-        #             self.data = data
-        #             self.size_left = data_size - len(data)
-        #         else:
-        #             self.ready_read.emit(self.client_id, data)
 
     @Slot()
     def __on_socket_disconnected(self):
@@ -123,7 +89,7 @@ class _Worker(QObject):
             self.socket.close()
         except RuntimeError:
             pass
-        self.closed.emit(self.client_id)
+        self.closed.emit()
 
     @Slot(bytes)
     def __on_write_signal(self, data: bytes):
@@ -135,8 +101,8 @@ class _Worker(QObject):
         Note:
             Emits written signal.
         """
-        write(self.socket, data)
-        self.socket.flush()
+        self.buffer.write(data)
+        # write(self.socket, data)
 
         # data = pack(HEADER, len(data)) + data
         # self.socket.write(data)
@@ -150,7 +116,7 @@ class ThreadBalancer(AbstractBalancer):
         self.workers = []
 
     @Slot(type, int)
-    def balance(self, socket_type: type, socket_descriptor: int):
+    def balance(self, socket_type: type, socket_descriptor: int) -> int:
         client_id = self.get_next_socket_id()
 
         worker = _Worker(client_id, socket_type, socket_descriptor)
@@ -168,11 +134,11 @@ class ThreadBalancer(AbstractBalancer):
         thread.started.connect(worker.start)
         self.workers.append((worker, thread))
         thread.start()
+        return client_id
 
     @Slot(int, bytes)
     def write(self, client_id: int, message: bytes):
         worker = self.__get_worker_by_client_id(client_id)
-        print(f"Writing to {client_id}: {message}")
         if worker:
             worker.write_signal.emit(message)
         else:
@@ -191,16 +157,12 @@ class ThreadBalancer(AbstractBalancer):
 
     @Slot()
     def close(self):
-        pass
+        for worker in self.workers:
+            worker.close_signal.emit()
+        self.closed.emit()
 
     @Slot(int)
     def __get_worker_by_client_id(self, client_id: int):
         for worker, thread in self.workers:
             if worker.objectName() == str(client_id):
                 return worker
-
-
-
-
-
-
