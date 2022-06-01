@@ -38,7 +38,7 @@ Usage
 See examples directory for client and server code samples.
 
 TCP Client
-~~~~~~
+~~~~~~~~~~
 
 
 
@@ -106,7 +106,7 @@ TCP Client
 
 
 TCPServer + ThreadPoolBalancer
-~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
