@@ -1,11 +1,10 @@
 from qtpy.QtWidgets import QApplication, QDialog, QPushButton, QVBoxLayout, QTextEdit
-from qtpy.QtCore import QObject, Slot, qInstallMessageHandler, Signal
+from qtpy.QtCore import QObject, Slot, Signal
 
 import sys
 import logging
 
-from QtPyNetwork.client import TCPClient
-from qrainbowstyle.extras import qt_message_handler
+from QtPyNetwork.client import ThreadedTCPClient
 
 IP = "127.0.0.1"
 PORT = 12500
@@ -47,11 +46,11 @@ class Main(QObject):
         super(Main, self).__init__(None)
         self.logger = logging.getLogger(self.__class__.__name__)
 
-        self.client = TCPClient()
-        # self.client.message.connect(self.on_message)
+        self.client = ThreadedTCPClient()
+        self.client.message.connect(self.on_message)
         self.client.connected.connect(self.on_connected)
+        self.client.disconnected.connect(self.on_disconnected)
         self.client.failed_to_connect.connect(self.on_failed_to_connect)
-        # self.client.disconnected.connect(self.close)
 
         self.main_window = MainWindow()
         self.main_window.send_text.connect(self.client.write)
@@ -69,6 +68,10 @@ class Main(QObject):
         self.logger.info(f"Connected to {ip}:{port}")
         self.client.write(b"Kick me plz")
 
+    @Slot()
+    def on_disconnected(self):
+        self.logger.info("Disconnected")
+
     @Slot(bytes)
     def on_message(self, data: bytes):
         self.logger.info(f"Received: {data}")
@@ -80,7 +83,9 @@ class Main(QObject):
     @Slot()
     def close(self):
         self.client.close()
-        self.client.wait()
+        while self.client.is_running():
+            print("Waiting for client to close")
+            self.client.wait()
         self.main_window.close()
         QApplication.instance().quit()
 
@@ -91,8 +96,6 @@ if __name__ == '__main__':
         format="%(asctime)s [%(threadName)s] [%(name)s] [%(levelname)s] %(message)s",
         handlers=[logging.StreamHandler()])
     logging.getLogger().debug("Logger enabled")
-
-    qInstallMessageHandler(qt_message_handler)
     app = QApplication(sys.argv)
 
     main = Main()

@@ -1,5 +1,5 @@
 from qtpy.QtWidgets import QApplication
-from qtpy.QtCore import QObject, Slot, QCoreApplication, qInstallMessageHandler
+from qtpy.QtCore import QObject, Slot, QCoreApplication
 
 import sys
 import logging

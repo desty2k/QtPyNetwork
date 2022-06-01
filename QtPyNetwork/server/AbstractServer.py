@@ -1,8 +1,8 @@
 from qtpy.QtCore import Slot, Signal, QObject, QThread
 from qtpy.QtNetwork import QTcpServer, QHostAddress
 
-from QtPyNetwork.models import Client
-from QtPyNetwork.exceptions import NotConnectedError, ServerNotRunning
+from QtPyNetwork.model import Client
+from QtPyNetwork.exception import NotConnectedError, ServerNotRunning
 
 import logging
 

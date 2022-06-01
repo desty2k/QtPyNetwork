@@ -15,11 +15,10 @@ class AbstractClient(QObject):
 
     def __init__(self):
         super(AbstractClient, self).__init__()
-        self._socket: QAbstractSocket = None
 
     @abstractmethod
     @Slot(str, int)
-    def start(self, ip: str, port: int):
+    def start(self, ip: str, port: int, timeout: int = 5):
         """Start client thread and connect to server."""
         pass
 
@@ -44,6 +43,7 @@ class AbstractClient(QObject):
         """
         self.connected.emit(ip, port)
 
+    @Slot(bytes)
     def on_message(self, message: bytes):
         """Called when client receives message from server.
         Emits message signal.
@@ -82,20 +82,19 @@ class AbstractClient(QObject):
         Emits closed signal."""
         self.closed.emit()
 
+    @abstractmethod
     @Slot()
     def close(self):
         """Disconnect from server and close socket."""
-        if self._socket:
-            self._socket.close()
-            self._socket = None
-        self.closed.emit()
+        pass
 
     @abstractmethod
     @Slot()
     def wait(self):
         pass
 
+    @abstractmethod
     @Slot()
-    def is_running(self):
+    def is_running(self) -> bool:
         """Check if client is running."""
-        return self._socket is not None
+        pass

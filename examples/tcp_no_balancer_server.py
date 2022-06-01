@@ -7,7 +7,7 @@ import traceback
 
 from QtPyNetwork.server import TCPServer
 from QtPyNetwork.balancer import NoBalancer
-from QtPyNetwork.models import Client
+from QtPyNetwork.model import Client
 
 IP = "127.0.0.1"
 PORT = 12500
@@ -23,8 +23,6 @@ class Main(QObject):
         self.server.connected.connect(self.on_client_connected)
         self.server.disconnected.connect(lambda client: print(f"Client disconnected: {client.id()}"))
         self.server.message.connect(lambda client, data: print(f"Received data from client {client.id()}: {data}"))
-        # self.server.disconnected.connect(self.on_disconnected)
-        # self.server.message.connect(self.on_message)
 
     @Slot()
     def start(self):
@@ -32,26 +30,8 @@ class Main(QObject):
 
     @Slot(Client, str, int)
     def on_client_connected(self, client, ip, port):
-        print(f"Hello new client! {client.id()} - {ip}:{port}")
+        self.logger.info(f"Hello new client! {client.id()} - {ip}:{port}")
         client.write(b"Hello from server")
-
-    # @Slot(Device, bytes)
-    # def on_message(self, device, message: bytes):
-    #     self.logger.info("Received {}: {}".format(device.id(), message))
-    #     if message.decode() == "Kick me plz":
-    #         device.kick()
-    #
-    # @Slot(Device)
-    # def on_disconnected(self, device):
-    #     self.logger.info("Disconnected: {}; Connected: {}".format(device.id(), device.is_connected()))
-    #     self.close()
-
-    # @Slot()
-    # def close(self):
-    #     self.srv.close()
-    #     while self.srv.is_running():
-    #         self.srv.wait()
-    #     QApplication.instance().quit()
 
 
 if __name__ == '__main__':

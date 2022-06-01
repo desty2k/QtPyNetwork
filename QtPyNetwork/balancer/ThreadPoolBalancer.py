@@ -15,8 +15,9 @@ class _Worker(QObject):
     closed = Signal()
 
     close_signal = Signal()
+    connection_signal = Signal(type, int, int)
     disconnect_signal = Signal(int)
-    write_signal = Signal(bytes)
+    write_signal = Signal(int, bytes)
 
     def __init__(self):
         super(_Worker, self).__init__()
@@ -25,14 +26,15 @@ class _Worker(QObject):
         self.sockets = {}
         self.close_signal.connect(self.__on_close_signal)
         self.write_signal.connect(self.__on_write_signal)
+        self.connection_signal.connect(self.__on_connection_signal)
         self.disconnect_signal.connect(self.__on_disconnect_signal)
 
     @Slot()
     def start(self):
         self.logger = logging.getLogger(f"ThreadPoolBalancerWorker-{self.objectName()}")
 
-    @Slot(int, int)
-    def add_socket(self, socket_type: type, client_id: int, socket_descriptor: int):
+    @Slot(type, int, int)
+    def __on_connection_signal(self, socket_type: type, client_id: int, socket_descriptor: int):
         socket: QAbstractSocket = socket_type()
         socket.setParent(None)
         if socket.setSocketDescriptor(socket_descriptor):
@@ -89,8 +91,8 @@ class _Worker(QObject):
                 pass
         self.closed.emit()
 
-    @Slot(bytes)
-    def __on_write_signal(self, data: bytes):
+    @Slot(int, bytes)
+    def __on_write_signal(self, client_id: int, data: bytes):
         """Write data to socket.
 
         Args:
@@ -99,9 +101,7 @@ class _Worker(QObject):
         Note:
             Emits written signal.
         """
-        client_id = int(self.sender().objectName())
         socket_buffer = self.sockets.get(client_id)
-        # print(client_id, self.sockets)
         if socket_buffer:
             socket_buffer[1].write(data)
 
@@ -127,7 +127,7 @@ class ThreadPoolBalancer(AbstractBalancer):
         client_id = self.get_next_socket_id()
         sockets_per_worker = [len(worker.sockets) for worker, thread in self.__workers]
         worker = self.__workers[sockets_per_worker.index(min(sockets_per_worker))][0]
-        worker.add_socket(socket_type, client_id, socket_descriptor)
+        worker.connection_signal.emit(socket_type, client_id, socket_descriptor)
         return client_id
 
     @Slot(int)
@@ -150,7 +150,7 @@ class ThreadPoolBalancer(AbstractBalancer):
     def write(self, client_id: int, message: bytes):
         worker = self.__get_worker_by_client_id(client_id)
         if worker:
-            worker.write_signal.emit(message)
+            worker.write_signal.emit(client_id, message)
         else:
             self.client_error.emit(client_id, Exception("Client not found"))
 

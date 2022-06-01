@@ -22,11 +22,6 @@ class DataBuffer(QObject):
     @Slot()
     def on_socket_ready_read(self) -> None:
         """Read data from socket."""
-        # while self.__socket.hasPendingDatagrams():
-        #     data = self.__socket.readDatagram(self.__socket.pendingDatagramSize())
-        #     print(data)
-        #     self.data.emit(data)
-
         while self.__socket.bytesAvailable():
             size_left = self.__size_left
             # print(f"Left: {size_left}")

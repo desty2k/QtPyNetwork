@@ -4,30 +4,32 @@ import sys
 import logging
 import traceback
 
-from QtPyNetwork.server import QBalancedServer
-from QtPyNetwork.models import Device
+from QtPyNetwork.server import TCPServer
+from QtPyNetwork.balancer import ThreadPoolBalancer
+from QtPyNetwork.model import Client
 
 IP, PORT = "127.0.0.1", 12500
 
 
-class Main(QBalancedServer):
+class Main(TCPServer):
 
     def __init__(self):
-        super(Main, self).__init__(None)
+        super(Main, self).__init__(ThreadPoolBalancer(threads=4))
         self.logger = logging.getLogger(self.__class__.__name__)
 
-    @Slot(Device, str, int)
-    def on_connected(self, device: Device, ip, port):
-        self.logger.info("New device connected: {}".format(device.id()))
+    @Slot(Client, str, int)
+    def on_connected(self, client: Client, ip, port):
+        self.logger.info("New client connected: {}".format(client.id()))
 
-    @Slot(Device, bytes)
-    def on_message(self, device: Device, message: bytes):
-        self.logger.info("Received from {}: {}".format(device.id(), message))
+    @Slot(Client, bytes)
+    def on_message(self, client: Client, message: bytes):
+        self.logger.info("Received from {}: {}".format(client.id(), message))
 
-    @Slot(Device)
-    def on_disconnected(self, device: Device):
-        self.logger.info("Device {} disconnected".format(device.id()))
+    @Slot(Client)
+    def on_disconnected(self, client: Client):
+        self.logger.info("Device {} disconnected".format(client.id()))
         self.close()
+
 
 if __name__ == '__main__':
     sys._excepthook = sys.excepthook

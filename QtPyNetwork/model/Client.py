@@ -2,14 +2,14 @@ from qtpy.QtCore import QObject, Slot, Signal
 
 import ipaddress
 
-from QtPyNetwork.exceptions import NotConnectedError
+from QtPyNetwork.exception import NotConnectedError
 
 
-class Device(QObject):
+class Client(QObject):
     """Represents psychical device connected to server."""
 
     def __init__(self, server, device_id: int, ip: str, port: int):
-        super(Device, self).__init__(None)
+        super(Client, self).__init__(None)
         try:
             ipaddress.ip_address(ip)
         except ValueError:
@@ -49,8 +49,8 @@ class Device(QObject):
         return self.__connected
 
     @Slot()
-    def kick(self):
-        self.server().kick(self)
+    def disconnect(self):
+        self.server().disconnect(self)
 
     @Slot(bytes)
     def write(self, message: bytes):
