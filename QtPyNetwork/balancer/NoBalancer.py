@@ -142,4 +142,3 @@ class NoBalancer(AbstractBalancer):
             except RuntimeError:
                 pass
         self.sockets.clear()
-

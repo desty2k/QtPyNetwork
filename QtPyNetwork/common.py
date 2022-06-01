@@ -58,4 +58,3 @@ class DataBuffer(QObject):
         data = pack(HEADER, len(data)) + data
         self.__socket.write(data)
         self.__socket.flush()
-

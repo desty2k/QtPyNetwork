@@ -1,5 +1,3 @@
-import logging
-
 from qtpy.QtCore import Slot, Signal, QThread, Qt
 from .TCPClient import TCPClient
 from .AbstractClient import AbstractClient
@@ -19,7 +17,6 @@ class _Worker(TCPClient):
         self.write_signal.connect(self.write)
         self.start_signal.connect(self.start)
         self.close_signal.connect(self.close, Qt.BlockingQueuedConnection)
-        self.disconnected.connect(lambda : print("Disconnected from server"))
 
     @Slot()
     def start(self):
@@ -69,14 +66,9 @@ class ThreadedTCPClient(AbstractClient):
         if self.__worker is not None and self.__thread is not None:
             self.__worker.wait(timeout)
             self.__thread.wait(timeout)
-            # return self.__worker.wait(timeout)
 
     @Slot()
     def close(self):
         if self.__worker is not None and self.__thread is not None:
             self.__worker.close_signal.emit()
-            # self.__worker.wait()
             self.__thread.quit()
-            # self.__thread.wait()
-            # self.__worker = None
-            # self.__thread = None
