@@ -1,6 +1,17 @@
 Changelog
 =========
 
+- 0.7.0:
+    - Complete code rewrite
+    - Split servers into servers and balancers
+    - Add abstract classes for servers, balancers and clients
+    - Add new balancer: NoBalancer
+    - Fix bug with closing unconneccted client
+    - Create separate buffer class for reading and writing data
+    - Rename Device to Client
+    - Emit Exception via signal instead of string
+    - Update examples
+
 - 0.6.1:
     - Fix ``setSocketDescriptor`` failing on Python 3.10
     - Get ``long_description`` for PyPi by reading ``README.rst``
